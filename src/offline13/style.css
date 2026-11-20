@@ -1,0 +1,212 @@
+
+:root{--ink:#19323b;--dark:#102b34;--dark2:#1d4148;--paper:#f5f4ef;--cream:#e8e5db;--line:#d9dad2;--sub:#6f7d7d;--gold:#c38d4e;--gold-dark:#986b38;--teal:#377c78;--bad:#b6524b;--good:#2d806f;--font:system-ui,-apple-system,'Segoe UI',Arial,sans-serif}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#e2e3dc;color:var(--ink);font:13px/1.48 var(--font)}button,select,input{font:inherit;color:inherit}button{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 12px;transition:.15s}button:hover{border-color:var(--gold);background:#f8f4eb}button:disabled{opacity:.4;cursor:default}input[type=range]{width:100%;accent-color:var(--gold)}input[type=number],select{width:100%;border:1px solid var(--line);background:white;padding:8px 9px;border-radius:7px}input:focus,select:focus{outline:2px solid #d5b38a}.shell{min-height:100vh;max-width:1720px;margin:auto;background:var(--paper);box-shadow:0 0 38px #1b313216}.topbar{height:72px;background:var(--dark);color:#fff;display:flex;align-items:center;gap:13px;padding:0 22px}.brand-symbol{width:42px;height:42px;display:grid;place-items:center;border:1px solid #dca96e;border-radius:11px;color:#e9c28c;font-size:28px;position:relative}.brand-symbol span{position:absolute;font-size:12px;bottom:5px;right:4px}.brand strong{font-size:18px;letter-spacing:1px}.brand em{font-style:normal;font-weight:400;color:#c9aa83}.brand small{display:block;color:#adc2c5;font-size:9px;letter-spacing:1.5px}.head-mid{color:#b5c5c4;margin-left:auto;font-size:10px;letter-spacing:1.3px}.head-mid b{color:#d4b688;font-weight:500;margin-left:10px}.live-dot{display:inline-block;background:#9ebeb0;width:7px;height:7px;border-radius:50%;margin-right:7px}.head-actions{display:flex;gap:8px}.head-actions button{border-color:#45636c;color:#f0f2ee;background:#1c4049;font-size:11px}.tabs{height:51px;display:flex;align-items:stretch;background:#f9f8f3;border-bottom:1px solid var(--line);padding:0 24px;gap:8px}.tabs button{background:transparent;border:0;border-radius:0;padding:0 19px;font-weight:650;color:#7c8885}.tabs button.selected{color:#163b42;border-bottom:3px solid var(--gold)}.tab-hint{margin:auto 0 auto auto;color:#9b9f9b;font-size:11px}.workspace{display:grid;grid-template-columns:246px minmax(350px,1fr) 277px;min-height:750px}.sidebar{border-right:1px solid var(--line);background:#f0efe9;min-width:0}.inspector{border-left:1px solid var(--line);background:#f9f8f4;min-width:0}.section-caption{font-size:10px;letter-spacing:1.6px;color:#9a8b74;font-weight:800;padding:23px 20px 11px}.scenario-list{max-height:482px;overflow:auto;padding:0 12px 18px}.scenario{display:flex;align-items:flex-start;text-align:left;gap:11px;width:100%;padding:11px 10px;background:transparent;border:1px solid transparent;margin-bottom:5px;border-radius:8px}.scenario:hover{background:#fff}.scenario.selected{background:#fff;box-shadow:0 2px 7px #1e3e4211;border-color:#d7d4c7}.scenario .no{min-width:24px;color:#a88e67;font-size:11px;margin-top:2px}.scenario .name{font-weight:700;font-size:12px}.scenario .country{font-size:10px;color:#84908c;margin-top:3px}.scenario .star{color:#c68b4e;font-size:11px;margin-left:auto}.side-info{border-top:1px solid var(--line);padding-bottom:20px}.side-info h3{font:600 23px/1.1 Georgia,serif;margin:0 19px 6px;color:var(--ink)}.side-info p{margin:12px 19px;font-size:12px;color:#62746f}.place{margin:0 19px;color:#aa7f51;font-size:11px;font-weight:700}.fact{margin:14px 18px;padding:11px;background:#e9e9e0;border-left:2px solid #c2a27d;font-size:11px;line-height:1.55;color:#586964}.central{min-width:0;background:#fff}.scene-header{height:90px;display:flex;align-items:center;justify-content:space-between;padding:15px 22px;gap:12px}.eyebrow{color:#ad916d;font-size:10px;letter-spacing:1.4px;font-weight:800}.scene-header h1{font:500 clamp(18px,2vw,28px)/1.15 Georgia,serif;margin:7px 0 0}.views{display:flex;gap:3px;padding:3px;border:1px solid var(--line);background:var(--paper);border-radius:9px}.views button{font-weight:800;font-size:11px;padding:8px 13px;border:0;background:transparent}.views button.selected{background:var(--dark);color:#fff}.canvas-wrap{height:min(54vw,510px);min-height:345px;position:relative;background:linear-gradient(#f2f5f3,#e5edef 80%,#dde6e6);overflow:hidden;border-top:1px solid #e1e6e2;border-bottom:1px solid #cfdad8}.canvas-wrap canvas{width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}.canvas-top,.canvas-bottom{position:absolute;pointer-events:none;color:#60787c;font-size:10px;letter-spacing:1px}.canvas-top{top:16px;left:18px}.canvas-bottom{bottom:13px;left:17px;background:#ffffffaf;padding:5px 8px;border-radius:5px}.zoom{position:absolute;top:15px;right:14px;display:flex;gap:5px}.zoom button{width:32px;height:32px;padding:0;background:#ffffffd9;box-shadow:0 2px 6px #2c44411a}.toolbar{display:flex;flex-wrap:wrap;gap:6px;padding:12px 15px;border-bottom:1px solid var(--line);background:#fafaf7}.toolbar button{font-size:11px;padding:8px 10px}.toolbar button.selected{background:#e9e3d6;border-color:#cc9a5b;color:#71491b}.actions{display:flex;align-items:center;gap:6px;padding:10px 15px;flex-wrap:wrap}.actions button{font-size:11px}.button-primary{margin-left:auto;color:#fff;background:var(--dark);border-color:var(--dark);font-weight:700}.button-primary:hover{color:white;background:#27525a}.button-muted{background:#faf9f5}.notice{margin:0 15px 15px;background:#edf2ee;border-left:3px solid #63908c;padding:11px 13px;font-size:12px;color:#45615b}.notice.good{background:#e5f4ec;border-left-color:var(--good)}.notice.bad{background:#f9eae8;border-left-color:var(--bad)}.formula-panel{margin:0 15px 16px;border:1px solid var(--line);padding:15px 17px;border-radius:8px;background:#fdfbf6}.formula-panel.hidden{display:none}.formula-head{display:flex;justify-content:space-between;align-items:center}.formula-head h3{font:600 17px Georgia,serif;margin:0}.formula-head button{font-size:20px;border:0;background:transparent;padding:0 4px}.formula-panel p{font-size:12px;color:#566c69}.formula-row{border-top:1px dashed #d5d8d1;padding:10px 0;display:flex;justify-content:space-between;gap:10px;align-items:center}.formula-row code{font-size:12px;color:#174b5b}.formula-row span{color:#986d3b;font-size:11px;max-width:40%;text-align:right}.inspector-inner{padding:2px 17px 22px}.inspector h3{font:600 21px Georgia,serif;margin:3px 0 13px}.input-group{margin:13px 0}.input-group label{display:flex;justify-content:space-between;align-items:center;color:#667875;font-weight:700;font-size:11px;margin-bottom:6px;gap:10px}.input-group output{color:#1a4951;font-variant-numeric:tabular-nums}.two-cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}.toggle-row{display:flex;gap:7px;align-items:center;background:#f2f1eb;padding:10px;border-radius:7px;margin:10px 0;font-size:11px}.material-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}.material-grid button{padding:9px 4px;font-size:11px;text-align:left;min-height:41px;display:flex;align-items:center;gap:6px}.material-grid button.selected{border-color:var(--gold);background:#fff2df}.swatch{width:9px;height:9px;display:inline-block;border-radius:2px;flex-shrink:0}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:16px 0}.metric{padding:10px;border:1px solid #dde2db;background:#fff;border-radius:8px}.metric .key{color:#88948f;text-transform:uppercase;letter-spacing:.5px;font-size:9px}.metric strong{display:block;font-size:16px;color:#264d53;margin-top:4px;font-variant-numeric:tabular-nums}.metric strong.bad{color:#b6524b}.metric strong.good{color:#27866f}.budget{display:flex;justify-content:space-between;color:#7c8882;font-size:11px}.bar{height:6px;background:#e4e5dc;border-radius:5px;margin:6px 0 10px;overflow:hidden}.bar span{height:100%;display:block;background:#bb8d56;border-radius:5px}.field-title{color:#a38c72;font-size:10px;font-weight:800;letter-spacing:1.2px;margin:17px 0 9px}.select-small{padding:8px 9px}.mini-note{font-size:11px;color:#74837c;margin:8px 0}.inspector .disclaimer{padding:14px 18px;border-top:1px solid var(--line);background:#f3f0e7;color:#776e63;font-size:11px}.disclaimer p{margin:5px 0;font-size:10px;line-height:1.5}footer{background:#102b34;padding:15px 23px;color:#b7c7c6;display:flex;justify-content:space-between;gap:15px;font-size:9px;letter-spacing:1.1px}select:disabled{background:#f0f0ed}
+@media(max-width:1050px){.workspace{grid-template-columns:190px minmax(300px,1fr) 234px}.head-mid{display:none}.sidebar .section-caption{padding-left:13px}.scenario-list{padding-left:7px;padding-right:7px}.side-info h3,.side-info p,.place{margin-left:13px;margin-right:13px}.inspector-inner{padding:2px 12px}.tabs{padding:0 9px}.tab-hint{display:none}.canvas-wrap{height:420px}}
+@media(max-width:780px){.workspace{grid-template-columns:minmax(0,1fr)}.sidebar{border-right:0;border-bottom:1px solid var(--line)}.sidebar>.section-caption{padding:13px 16px 3px}.scenario-list{display:flex;gap:6px;overflow:auto;max-height:none;padding:7px 12px 10px}.scenario{flex-shrink:0;width:155px}.side-info{padding:0 14px 14px}.side-info .section-caption{padding:12px 0 5px}.side-info h3,.side-info p,.place{margin:5px 0}.fact{margin:9px 0}.inspector{border-left:0;border-top:1px solid var(--line)}.inspector-inner{padding:5px 17px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 17px}.inspector-inner>h3,.inspector-inner>.section-caption,.inspector-inner>.metrics,.inspector-inner>.material-grid,.inspector-inner>.budget,.inspector-inner>.bar,.inspector-inner>.mini-note,.inspector-inner>.field-title{grid-column:1/-1}.head-actions button{font-size:10px}.canvas-wrap{height:440px}.scene-header{height:80px}.tabs button{padding:0 9px;font-size:12px}}
+@media(max-width:430px){.topbar{padding:0 10px}.brand strong{font-size:14px}.brand small{font-size:7px}.brand-symbol{width:34px;height:34px}.head-actions{gap:3px}.head-actions button{padding:8px 4px}.canvas-wrap{height:340px;min-height:340px}.toolbar,.actions{padding:8px;gap:5px}.toolbar button,.actions button{padding:7px 8px;font-size:10px}.scene-header{padding:12px}.scene-header h1{font-size:19px}.inspector-inner{display:block}footer span:last-child{display:none}}
+
+.scenario .name,.scenario .country{display:block}.scenario .name{line-height:1.32}.scenario .country{line-height:1.35}.scenario .star{min-width:13px}
+/* TrussLab 3.0: selectable UI themes and 3D terrain workshop */
+#stage-3d{position:absolute;inset:0;width:100%;height:100%;z-index:1;cursor:grab}
+#stage-3d:active{cursor:grabbing}
+.canvas-top,.canvas-bottom,.zoom{z-index:2}
+.terrain-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 14px;background:var(--paper);border-bottom:1px solid var(--line)}
+.terrain-toolbar span{color:var(--gold);font-size:10px;letter-spacing:1.1px;font-weight:800;margin-right:3px}
+.terrain-toolbar button{padding:8px 9px;font-size:11px;background:var(--cream);border-color:var(--line)}
+.terrain-toolbar button.selected{background:var(--dark2);color:white;border-color:var(--teal)}
+.terrain-toolbar label{display:flex;align-items:center;gap:7px;color:var(--sub);font-size:11px}
+.terrain-toolbar input{width:80px}
+.terrain-toolbar[data-map="1"] [data-brush]:not([data-brush="orbit"]){opacity:.36;cursor:not-allowed}
+#theme-toggle{min-width:92px}
+:root[data-theme="dark"]{--ink:#dbe9e7;--dark:#0c1822;--dark2:#27424b;--paper:#152631;--cream:#223541;--line:#304955;--sub:#90a9ad;--gold:#e3b477;--gold-dark:#eac18f;--teal:#51a8a5;--bad:#e57a6d;--good:#69c4a0}
+:root[data-theme="dark"] body{background:#09131d;color:var(--ink)}
+:root[data-theme="dark"] .shell{background:var(--paper);box-shadow:0 0 32px #060f18a0}
+:root[data-theme="dark"] .sidebar{background:#162735;border-color:var(--line)}
+:root[data-theme="dark"] .inspector{background:#192b36;border-color:var(--line)}
+:root[data-theme="dark"] .central{background:#10212b}
+:root[data-theme="dark"] .tabs{background:#132633}
+:root[data-theme="dark"] .tabs button{color:#a9b8bf}
+:root[data-theme="dark"] .tabs button.selected{color:#f5ddb6}
+:root[data-theme="dark"] button{background:#203541;color:#dfe8e7;border-color:var(--line)}
+:root[data-theme="dark"] button:hover{background:#2d4750;border-color:var(--gold)}
+:root[data-theme="dark"] .head-actions button{background:#243743;border-color:#405565}
+:root[data-theme="dark"] .scenario.selected{background:#29414b;border-color:#607076;box-shadow:none}
+:root[data-theme="dark"] .scenario:hover{background:#233b46}
+:root[data-theme="dark"] .scenario .country{color:#a6bac0}
+:root[data-theme="dark"] .side-info h3{color:#f3e7d6}
+:root[data-theme="dark"] .side-info p{color:#a7bdc3}
+:root[data-theme="dark"] .place{color:#e9bd85}
+:root[data-theme="dark"] .fact{background:#213640;color:#c0d0d0;border-left-color:#d5a978}
+:root[data-theme="dark"] .scene-header h1{color:#f2eadf}
+:root[data-theme="dark"] .views{background:#20313a}
+:root[data-theme="dark"] .views button.selected{background:#e0b67f;color:#172c31}
+:root[data-theme="dark"] .toolbar{background:#192e3a}
+:root[data-theme="dark"] .toolbar button.selected{background:#4c4337;color:#ffdca9}
+:root[data-theme="dark"] .actions{background:#10212b}
+:root[data-theme="dark"] .button-primary{background:#cfa26d;color:#142c36;border-color:#e7b77a}
+:root[data-theme="dark"] .notice{background:#253945;color:#cddedb}
+:root[data-theme="dark"] .notice.good{background:#1e423a;color:#c4f1dc}
+:root[data-theme="dark"] .notice.bad{background:#45313b;color:#f1c5c5}
+:root[data-theme="dark"] .inspector h3{color:#eee7d8}
+:root[data-theme="dark"] .inspector-inner{color:#d7e2df}
+:root[data-theme="dark"] .metric{background:#223743;border-color:#3b5360}
+:root[data-theme="dark"] .metric .key{color:#a6b9ba}
+:root[data-theme="dark"] .metric strong{color:#f2f0de}
+:root[data-theme="dark"] .budget{color:#bfccca}
+:root[data-theme="dark"] .bar{background:#304955}
+:root[data-theme="dark"] .toggle-row{background:#243944}
+:root[data-theme="dark"] .material-grid button.selected{background:#4a413a}
+:root[data-theme="dark"] .inspector .disclaimer{background:#2c3438;color:#c4c6be}
+:root[data-theme="dark"] input[type=number],:root[data-theme="dark"] select{background:#203b46;color:#ecf1ef;border-color:#42606c}
+:root[data-theme="dark"] .formula-panel{background:#1c313b}
+:root[data-theme="dark"] .formula-panel p,:root[data-theme="dark"] .mini-note{color:#b8c8c7}
+:root[data-theme="dark"] .formula-row code{color:#a5e2e0}
+:root[data-theme="dark"] .canvas-bottom{background:#102633df;color:#d5e0dd}
+:root[data-theme="dark"] .canvas-top{color:#dde5e3;text-shadow:0 1px 3px #1c2933}
+:root[data-theme="dark"] .zoom button{background:#213943e6;color:#e5eded}
+:root[data-theme="dark"] .canvas-wrap{background:#203744}
+
+.map-legend{position:absolute;z-index:3;top:50px;left:14px;display:flex;flex-direction:column;gap:4px;background:#102a36e8;color:#ebf3ef;padding:11px 13px;border:1px solid #547178;border-radius:9px;max-width:min(330px,78%);pointer-events:none;box-shadow:0 6px 20px #0c1a2499}
+.map-legend b{font-size:11px;letter-spacing:1.2px;color:#e8bf88}
+.map-legend span{font-size:10px}
+.map-legend small{font-size:9px;color:#a8bec2}
+
+/* v4 cinematic controls — keep old light/dark theme support intact */
+.camera-toolbar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:9px 12px;background:var(--paper);border-bottom:1px solid var(--line)}
+.camera-toolbar>span{font-size:9px;font-weight:800;letter-spacing:1.15px;color:var(--gold);margin-right:6px}
+.camera-toolbar button{font-size:11px;padding:8px 9px;background:var(--cream)}
+.camera-toolbar button:hover{border-color:var(--gold)}
+.camera-toolbar label{font-size:10px;display:flex;align-items:center;gap:6px;color:var(--sub)}
+.camera-toolbar select{width:auto;min-width:80px;font-size:11px;padding:7px;border-radius:7px}
+.camera-hud{position:absolute;z-index:4;bottom:54px;right:12px;background:#0b1c22c7;border:1px solid #6d9c9a6b;padding:6px 9px;border-radius:6px;color:#e4f0ed;font-size:10px;letter-spacing:.3px;pointer-events:none;font-variant-numeric:tabular-nums}
+.minimap{position:absolute!important;z-index:4;right:13px;top:59px;width:218px!important;height:112px!important;display:block;border-radius:8px;border:1px solid #8b9e9e;box-shadow:0 2px 18px #0a202b88;background:#133d4e;pointer-events:none;opacity:.95}
+.canvas-wrap:has(#stage-3d[style*="block"]){background:linear-gradient(#6996ae,#c3d9de 75%,#e3f0ed)}
+:root[data-theme="dark"] .canvas-wrap:has(#stage-3d[style*="block"]){background:linear-gradient(#638ca4,#c0d7da)}
+:root[data-theme="dark"] .camera-toolbar{background:#142e38}
+:root[data-theme="dark"] .camera-toolbar button{background:#24424b;border-color:#41616c;color:#e8f2ee}
+:root[data-theme="dark"] .camera-toolbar select{background:#1a3540;border-color:#46606d;color:#ebf4ef}
+:root[data-theme="dark"] .camera-toolbar label{color:#bdd2d0}
+:root[data-theme="dark"] .canvas-bottom{background:#0d2632c9;color:#d3e4e7}
+:root[data-theme="dark"] .canvas-top{color:#eff7f7;text-shadow:0 1px 4px #0d2e3b}
+:root[data-theme="dark"] .zoom button{background:#193744e8;color:#eff7f2;border-color:#60838b}
+@media(max-width:630px){.camera-toolbar{gap:4px;padding:7px}.camera-toolbar>span{width:100%}.camera-toolbar button{font-size:10px;padding:6px 7px}.camera-toolbar select{font-size:10px}.minimap{display:none!important}.camera-hud{right:7px;bottom:48px;font-size:9px}}
+
+/* Immersive optional 3D inspection */
+.canvas-wrap:fullscreen{width:100vw!important;height:100vh!important;background:#527c95}.canvas-wrap:fullscreen #stage-3d{width:100%!important;height:100%!important}.canvas-wrap:fullscreen .minimap{top:22px;right:22px}.canvas-wrap:fullscreen .camera-hud{right:20px;bottom:18px}.canvas-wrap:fullscreen .canvas-bottom{bottom:20px}
+
+/* Version 6 / Ultra visual profiles, satellite reference panel */
+.camera-toolbar .render-scale{white-space:nowrap;display:flex;align-items:center;gap:5px}
+#render-scale{width:80px;accent-color:#dfb879;cursor:pointer}
+#render-scale-value{min-width:32px;font-variant-numeric:tabular-nums;color:var(--gold);font-size:10px}
+.satellite-overlay{position:absolute;right:14px;top:185px;z-index:7;width:min(400px,82%);padding:10px;background:#0b1c25ed;color:#eaf1eb;border:1px solid #87b8b094;border-radius:12px;box-shadow:0 14px 38px #061923c4;backdrop-filter:blur(8px)}
+.satellite-overlay[hidden]{display:none!important}.satellite-overlay .satellite-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;gap:8px}.satellite-overlay strong{letter-spacing:1.1px;font-size:10px;color:#edd3a6}.satellite-overlay button{padding:3px 9px;background:#283d49;color:#f0f7f1;border:1px solid #638089}.satellite-overlay img{display:block;width:100%;height:auto;border-radius:7px;border:1px solid #52686b}.satellite-overlay p{font-size:10px;line-height:1.5;color:#bbd0cb;margin:8px 0 0}
+@media(max-width:700px){.satellite-overlay{top:110px;right:6px;width:85%;padding:7px}.camera-toolbar .render-scale{width:100%}.minimap{display:none!important}}
+
+/* v7.2 editable architecture surface */
+#plan-toggle{border-color:#729c9b;color:#e6d0a0;background:#163842;}
+#bridge-3d-edit{border-color:#7d9592;background:#213f49;color:#f2dfb6;}
+#bridge-3d-edit.selected{border-color:#d4a55c;background:#694d2b;color:#fff2ce;box-shadow:0 0 0 1px #d4a55c52 inset;}
+
+/* v8: independent editable visual road and railway grades, shared datum at the arches */
+.crossing-profile{background:var(--paper);padding:10px 15px 12px;border-bottom:1px solid var(--line);color:var(--ink)}
+.crossing-profile[hidden]{display:none!important}.profile-title{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:7px}
+.profile-title strong{display:block;font-size:12px;letter-spacing:.4px;color:var(--ink)}.profile-title span{display:block;color:var(--sub);font-size:10px;margin-top:3px}
+.profile-title button{font-size:10px;padding:7px 10px;background:var(--cream);border:1px solid var(--line);border-radius:6px}
+#profile-canvas{display:block;width:100%;height:90px;border:1px solid var(--line);border-radius:8px}
+.grade-inputs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:9px}
+.grade-inputs label{display:flex;flex-wrap:wrap;align-items:center;gap:5px;color:var(--sub);font-size:10px;min-width:0}
+.grade-inputs input{accent-color:var(--gold);width:100%;cursor:pointer}
+.grade-inputs output{color:var(--gold);font-weight:700;white-space:nowrap}
+@media(max-width:690px){.grade-inputs{grid-template-columns:1fr}.grade-inputs label{display:grid;grid-template-columns:1fr auto}.grade-inputs label input{grid-column:1/-1}#profile-canvas{height:76px}}
+/* Geo-alignment controls remain readable without expanding the camera HUD. */
+.camera-toolbar #route-geo-import,.camera-toolbar #route-geo-check{border-color:#c19d66;background:#2c514b;color:#f8f1e0}
+.camera-toolbar #route-geo-export{border-style:dashed}
+:root[data-theme="light"] .camera-toolbar #route-geo-import,:root[data-theme="light"] .camera-toolbar #route-geo-check{background:#e5f1e8;color:#214e42}
+
+/* 10.1 TerraBuild: compact responsive city editor, separate from terrain sculpting */
+.settlement-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:9px 12px;background:var(--panel,#15313b);border:1px solid #6c94964b;border-radius:9px;margin:8px 0;font-size:12px}
+.settlement-toolbar strong{font-size:11px;letter-spacing:.08em;color:#87c9be;padding:0 7px}
+.settlement-toolbar button{min-height:29px;padding:5px 9px;border:1px solid #55798180;background:rgba(25,60,74,.60);border-radius:6px;color:inherit;cursor:pointer;white-space:nowrap}
+.settlement-toolbar button:hover{border-color:#d9b77d}
+.settlement-toolbar button.selected{background:#357569;color:white;border-color:#6bd8ba}
+.settlement-toolbar label{display:flex;align-items:center;gap:6px;color:#a7bfc2;font-size:11px}
+.settlement-toolbar input[type=range]{width:75px;accent-color:#70cdb7}
+.settlement-toolbar output,.building-counter{font-weight:700;color:#85d1c3}
+.settlement-toolbar .building-hint{font-size:10px;color:#93b4b5;flex-basis:100%}
+@media(max-width:920px){.settlement-toolbar{max-height:165px;overflow:auto}.settlement-toolbar button{font-size:11px}}
+
+/* 10.3 RegionStream: independent regional atlas, no whole-map 3D preallocation. */
+.atlas-overlay{position:fixed;inset:12px;z-index:500;display:flex;flex-direction:column;background:#0e252c;color:#dbe9e8;border:1px solid #6a9699;border-radius:13px;box-shadow:0 14px 65px #0009;overflow:hidden;font:13px system-ui,sans-serif;min-height:0}
+.atlas-overlay[hidden]{display:none!important}
+.atlas-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 16px;background:#152d35}
+.atlas-head strong{font-size:15px;letter-spacing:.045em}.atlas-head small{display:block;color:#9bb6b8;margin-top:3px}
+.atlas-overlay button{font:inherit;color:#dfece9;background:#25434d;border:1px solid #43636a;border-radius:7px;padding:7px 10px;cursor:pointer;white-space:nowrap}
+.atlas-overlay button:hover{background:#3e626e}
+.atlas-controls{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 12px;background:#18333b;border-bottom:1px solid #31545e}
+.atlas-urlbar{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#1b3037;flex-wrap:wrap}
+.atlas-urlbar input{background:#0d252c;border:1px solid #50717a;border-radius:7px;color:#e6f2f0;padding:7px;flex:1;min-width:230px}
+.atlas-urlbar small{color:#7cc7be}.atlas-urlbar span{white-space:nowrap;color:#abbfc0}
+.atlas-stage-wrap{flex:1;min-height:200px;position:relative;background:#16353f}
+#atlas-stage{display:block;width:100%;height:100%;cursor:grab;touch-action:none}#atlas-stage:active{cursor:grabbing}
+.atlas-note{position:absolute;left:12px;bottom:12px;font-size:10px;color:#e6eded;pointer-events:none;background:#142a32c9;padding:5px 8px;border-radius:5px}
+.atlas-foot{display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px 12px;background:#10262e;color:#c7d6d8}
+#atlas-status{flex:1;min-width:230px}#atlas-scale{font-weight:600}#atlas-cursor{font-variant-numeric:tabular-nums}
+@media(max-width:700px){.atlas-overlay{inset:0;border-radius:0}.atlas-head{padding:8px}.atlas-urlbar span{display:none}.atlas-head small{font-size:10px}}
+
+/* 10.4 RegionWorld — separate GPU window; bridge renderer remains untouched. */
+.region3d-overlay{z-index:530}
+.region3d-stage-wrap{position:relative;flex:1;min-height:260px;background:#142e35;overflow:hidden}
+#region3d-stage{display:block;width:100%;height:100%;touch-action:none;cursor:grab;outline:none}
+#region3d-stage:active{cursor:grabbing}
+.region3d-controls{gap:7px}
+.region3d-controls button{padding:7px 10px;font-size:12px}
+.region3d-hud{position:absolute;top:12px;left:12px;right:12px;pointer-events:none;font-size:11px;color:#dff4ed;text-shadow:0 1px 3px #000;background:#102833b7;border:1px solid #ffffff30;border-radius:8px;padding:8px;max-width:96%;white-space:normal}
+.region3d-footnote{position:absolute;bottom:10px;left:10px;right:12px;pointer-events:none;font-size:10px;color:#d0e1e3;background:#142a32b8;padding:7px;border-radius:6px;max-width:max-content}
+.region3d-pad{display:none;position:absolute;right:12px;bottom:42px;gap:4px;flex-direction:column;align-items:center;z-index:3}
+.region3d-pad>div{display:flex;gap:4px}.region3d-pad button{width:40px;height:36px;padding:4px;background:#274955e5;border:1px solid #9abcc8b8;color:white;border-radius:7px;touch-action:none}
+@media(pointer:coarse){.region3d-pad{display:flex}.region3d-footnote{bottom:8px;left:8px;right:158px;font-size:9px}}
+@media(max-width:800px){.region3d-controls{max-height:106px;overflow:auto}.region3d-hud{font-size:10px}.region3d-footnote{font-size:9px}}
+
+/* 10.5 GPU canvas stays pointer-transparent; the old canvas receives camera controls. */
+.region3d-webgpu-layer{display:block;touch-action:none;}
+.region3d-hud,.region3d-footnote{z-index:2;}
+
+/* AssetStudio: readable catalogue control in regional 3D toolbar. */
+.region3d-controls select{background:#213b46;color:#eaf6f5;border:1px solid #486574;border-radius:7px;padding:7px 9px;min-width:105px;font:inherit;cursor:pointer}.region3d-controls select:focus-visible{outline:2px solid #edc578}
+
+/* 11.4: compact earthwork diagnostics within the existing grade profiler. */
+.earthworks-report{font-size:11px;line-height:1.45;padding:9px 12px;margin:7px 0 0;border-left:3px solid #dcae65;color:var(--muted,#bed0cc);background:rgba(35,75,82,.16);border-radius:4px}
+.earthworks-report[hidden]{display:none}
+/* 11.4 mobile: the old flex-nowrap view bar scrolled the whole document
+   horizontally when 2D plan controls appeared, hiding most of the map. */
+@media(max-width:600px){
+  html,body{max-width:100%;}
+  .topbar{height:auto;min-height:70px;flex-wrap:wrap;gap:7px;padding:9px 12px;}
+  .topbar .brand{flex:1 1 auto;min-width:145px;}
+  .topbar .head-actions{display:flex;flex:1 1 100%;min-width:0;flex-wrap:wrap;justify-content:stretch;}
+  .head-actions button{flex:1 1 65px;min-width:0;}
+  .tabs{overflow-x:auto;max-width:100vw;}
+  .scene-header{height:auto;min-height:80px;flex-wrap:wrap;align-items:start;gap:8px;padding:12px;}
+  .scene-header>div:first-child{width:100%;min-width:0;}
+  .views{width:100%;max-width:100%;min-width:0;flex-wrap:wrap;}
+  .views button{flex:1 1 73px;min-width:0;white-space:normal;line-height:1.25;padding:9px 5px;}
+}
+
+
+.tl-opt{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--muted,#a7bec3)}.tl-opt select{max-width:170px;border:1px solid #51727b;border-radius:8px;background:#1c3540;color:#e4f0ee;padding:6px}
+@media(max-width:600px){.tl-opt{flex:1 1 140px}.tl-opt select{min-width:95px;max-width:155px}}
+
+/* 11.8: optional touch joystick for testing on Android; hidden unless explicitly enabled. */
+.canvas-wrap{position:relative}
+.tl-touch-pad[hidden]{display:none!important}
+.tl-touch-pad{position:absolute;right:10px;bottom:48px;z-index:14;background:rgba(11,38,49,.85);padding:8px;border:1px solid rgba(170,206,209,.3);border-radius:11px;max-width:205px;touch-action:none}
+.tl-touch-pad-heading{font:600 10px system-ui,sans-serif;color:#cbe1df;text-align:center;padding:2px 0 7px}
+.tl-touch-grid{display:grid;grid-template-columns:repeat(3,48px);grid-auto-rows:43px;gap:6px}
+.tl-touch-grid button{font-size:20px;color:#e8f3f3;background:#264653;touch-action:none;border-radius:9px;border:1px solid #5d8286;cursor:pointer}
+.tl-touch-grid button:active,.tl-touch-grid button.pressed{background:#dcb77a;color:#243642}
+@media(max-width:600px){.tl-touch-pad{bottom:46px;right:7px}.tl-touch-grid{grid-template-columns:repeat(3,43px);grid-auto-rows:40px}}
+
+/* 13.0 optional GPU budget panel, visually separate from the large 3D HUD. */
+.tl-perf-report[hidden]{display:none!important}
+.tl-perf-report{position:absolute;z-index:15;right:10px;top:52px;max-width:min(460px,calc(100% - 22px));padding:10px 12px;background:rgba(12,35,45,.89);border:1px solid #679397;border-radius:9px;color:#d3ebeb;font:12px/1.45 system-ui,sans-serif;pointer-events:none}
+#perf-toggle[aria-pressed="true"],#mobile-freecam-toggle[aria-pressed="true"]{background:#d5b47e;color:#213a42}
+@media(max-width:600px){.tl-perf-report{top:48px;left:10px;right:10px;max-width:none;font-size:11px}}
