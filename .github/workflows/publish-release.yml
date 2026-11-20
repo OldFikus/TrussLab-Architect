@@ -1,0 +1,69 @@
+name: Build and publish TrussLab 13.0
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tools/build.py'
+      - 'docs/RELEASE_13_RU.md'
+      - '.github/workflows/publish-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.repository == 'OldFikus/TrussLab-Architect'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current sources
+        uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Node for JavaScript syntax checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate and build release
+        run: |
+          node --check src/game.js
+          node --check src/rendercore/materials.js
+          node --check src/rendercore/capabilities.js
+          python tools/build.py
+      - name: Verify artifacts are standalone and repository stays clean
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          root = Path('dist')
+          html = root / 'TrussLab_Architect_13_0.html'
+          s = html.read_text(encoding='utf-8')
+          assert len(s) > 1500000
+          assert '<title>TrussLab Architect 13.0 — RenderCore Complete</title>' in s
+          for token in ('post-mode','water-mode','headlights-toggle','gpu-budget','region3d-open','earthworks-toggle'):
+              assert token in s, token
+          for f in ('TrussLab_Architect_13_0_Portable.zip','TrussLab_Architect_13_0_Source.zip'):
+              with ZipFile(root/f) as z: assert z.testzip() is None
+          print('Release artifacts verified:', [(p.name,p.stat().st_size) for p in root.iterdir()])
+          PY
+      - name: Publish Release v13.0.0 (assets do not enter git)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v13.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release v13.0.0 already exists; leaving published assets unchanged.'
+          else
+            gh release create v13.0.0 \
+              dist/TrussLab_Architect_13_0.html \
+              dist/TrussLab_Architect_13_0_Portable.zip \
+              dist/TrussLab_Architect_13_0_Source.zip \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title 'TrussLab Architect 13.0 — RenderCore Complete' \
+              --notes-file docs/RELEASE_13_RU.md \
+              --latest
+          fi
