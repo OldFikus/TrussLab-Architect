@@ -997,7 +997,8 @@ function regionCityDetail(distance,quality='high'){
 /** Cosmetic LOD, NOT surveyed architectural details. Deterministic per-feature mesh. */
 function buildRegionCityTile(pack,fc,{tx,ty,tileSizeMeters,sizeLimit=1800,detail='base'}={}){
  const m=new RegionMesh(),size=tileSizeMeters||2048,x0=tx*size,y0=ty*size;let windowQuads=0,parapets=0;
- const features=fc?.features||[];let buildings=0,roads=0,rails=0,estimated=0,processed=0; for(const f of features){if(processed++>sizeLimit)break;const kind=classify(f),g=f?.geometry,p=f?.properties||{};
+ const features=fc?.features||[];let buildings=0,roads=0,rails=0,estimated=0,processed=0;
+ for(const f of features){if(processed++>sizeLimit)break;const kind=classify(f),g=f?.geometry,p=f?.properties||{};
   if(!g||!kind)continue;
   if(kind==='building'){
    const parts=g.type==='Polygon'?[g.coordinates]:g.type==='MultiPolygon'?g.coordinates.slice(0,8):[];
@@ -1996,7 +1997,8 @@ const FOUND={
 const BRIDGES=[
  {id:'academy',name:'Учебная ферма',place:'Академия TrussLab',kind:'truss',style:'warren',span:18,n:6,h:3.5,load:42,limit:.065,soil:'gravel',description:'Постройте устойчивую ферму и сравните усилия стержней.',info:'Учебный сценарий: 18 м — игровой размер.'},
  {id:'kerch',name:'Крымский мост',place:'Керченский пролив',kind:'arch',span:40,n:12,h:9.5,load:72,limit:.095,soil:'silt',description:'Детализированный учебный арочный фрагмент с раздельной автодорожной и двухпутной железнодорожной частями.',info:'Реальный переход около 19 км. В TrussLab используется приближённая реконструкция крупного арочного участка и подходов с двухпутной железнодорожной линией.'},
- {id:'paton',name:'Мост Патона',place:'Киев · Днепр',kind:'truss',style:'pratt',span:30,n:8,h:4.5,load:72,limit:.09,soil:'clay',description:'Задача на сварные стальные конструкции и равномерные транспортные нагрузки.',info:'Мост Патона в Киеве — исторический цельносварной мост длиной 1543 м. Игровая ферма стилизована и не повторяет реальные балочные пролёты.'}, {id:'pivdennyi',name:'Южный мост',place:'Киев · Днепр',kind:'cable',span:40,n:10,h:15,load:84,limit:.13,soil:'sand',description:'Вантовая система: найдите эффективный путь передачи усилий в пилон.',info:'Южный мост — вантовый мост Киева; главный пролёт реального моста — около 271 м. Модель уменьшена.'},
+ {id:'paton',name:'Мост Патона',place:'Киев · Днепр',kind:'truss',style:'pratt',span:30,n:8,h:4.5,load:72,limit:.09,soil:'clay',description:'Задача на сварные стальные конструкции и равномерные транспортные нагрузки.',info:'Мост Патона в Киеве — исторический цельносварной мост длиной 1543 м. Игровая ферма стилизована и не повторяет реальные балочные пролёты.'},
+ {id:'pivdennyi',name:'Южный мост',place:'Киев · Днепр',kind:'cable',span:40,n:10,h:15,load:84,limit:.13,soil:'sand',description:'Вантовая система: найдите эффективный путь передачи усилий в пилон.',info:'Южный мост — вантовый мост Киева; главный пролёт реального моста — около 271 м. Модель уменьшена.'},
  {id:'metro',name:'Мост Метро',place:'Киев · Днепр',kind:'arch',span:26,n:8,h:5,load:88,limit:.09,soil:'loam',description:'Арочно-балочный учебный пролёт с повышенной нагрузкой от транспорта.',info:'Мост Метро в Киеве включает многоуровневое движение. Здешняя механика — учебная аппроксимация.'},
  {id:'golden',name:'Золотые Ворота',place:'Сан-Франциско · США',kind:'suspension',span:46,n:12,h:17,load:105,limit:.16,soil:'rock',description:'Подвесная схема: тросы, пилоны и жёсткость дорожного полотна.',info:'Golden Gate Bridge имеет основной подвесной пролёт 1280 м. Игровые 46 м и нагрузки не имеют масштаба реального сооружения.'},
  {id:'brooklyn',name:'Бруклинский мост',place:'Нью-Йорк · США',kind:'suspension',span:42,n:12,h:14,load:90,limit:.15,soil:'rock',description:'Исторические каменные пилоны и сочетание подвесной схемы с усилением.',info:'Реальный мост открыт в 1883 году. Конструктивная геометрия условная.'},
@@ -2995,7 +2997,8 @@ ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
    target=(this.plannedBridgeDeck(edge,isRoad)-1.90)*(1-smooth)+(grade-.46)*smooth;
    if(sourceHeight>target){desired=target;kind='cut';}
    else if(sourceHeight>-1.43){
-    desired=Math.min(target,sourceHeight+2.7);kind='fill';   }else{desired=sourceHeight;kind='water';}
+    desired=Math.min(target,sourceHeight+2.7);kind='fill';
+   }else{desired=sourceHeight;kind='water';}
   }
   maxDiff=Math.abs(sourceHeight-desired);
   // The excavation's lateral extent depends on its *depth*: approximately
@@ -3994,7 +3997,8 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
   const mirrorPos=f(pos),mirrorTarget=f(look);
   const delta=r.view?Math.hypot(...sub(pos,r.view.pos)):Infinity;
   if(r.ready&&now-r.updated<300&&delta<.65&&Math.abs(this.yaw-r.view.yaw)<.01&&Math.abs(this.pitch-r.view.pitch)<.01)return true;
-  r.matrix=matmul(perspective(Math.PI/3,W/H,.13,900),lookAt(mirrorPos,mirrorTarget));  // Prevent WebGL texture feedback: a render target must never be bound to a sampler while attached.
+  r.matrix=matmul(perspective(Math.PI/3,W/H,.13,900),lookAt(mirrorPos,mirrorTarget));
+  // Prevent WebGL texture feedback: a render target must never be bound to a sampler while attached.
   gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_2D,null);
   gl.bindFramebuffer(gl.FRAMEBUFFER,r.fb);gl.viewport(0,0,r.size,r.size);gl.clearColor(.27,.47,.58,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   gl.useProgram(this.prog);gl.uniform1f(this.uReflectionPass,1);gl.uniform1f(this.uReflectionEnabled,0);
@@ -4993,7 +4997,8 @@ root.addEventListener('click',e=>{let el=e.target.closest('button');if(!el)retur
  case'download':{let pack={version:9,crossing:crossingSettings(),coastMode:world3d.coastMode,buildings:world3d.settlement.toJSON(),cityGeoJSON:world3d.cityData?.sourceGeoJSON||null,cityEnabled:world3d.cityEnabled,geoPack:world3d.geoPackSource,geoRoute:world3d.geoRouteSource,demEnabled:world3d.demEnabled,track:st.track,idx:st.idx,model:st.model,foundation:st.foundation,terrain:[...world3d.terrain],paint:[...world3d.paintLayer],mapEdit:[...world3d.mapEdit]};let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(pack,null,2)],{type:'application/json'}));a.download='TrussLab_Project_v10_2_GeoCity.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);note('JSON проекта экспортирован.');break}
  }
 });
-root.addEventListener('change',e=>{let el=e.target; if(el.dataset.field==='case'){st.loadCase=el.value;st.analysis=null;render();return}
+root.addEventListener('change',e=>{let el=e.target;
+ if(el.dataset.field==='case'){st.loadCase=el.value;st.analysis=null;render();return}
  if(el.dataset.field==='edge-type'){let edge=st.model.edges.find(e=>e.id===st.selected?.id);if(edge){editMark();edge.type=el.value;st.analysis=null;render()}return}
  if(el.dataset.field==='soil'){editMark();st.foundation.soil=el.value;st.analysis=null;render();return}
  if(el.dataset.number){let field=el.dataset.number,v=clamp(Number(el.value),4,35);editMark();st.foundation[field]=v;st.analysis=null;render();return}
@@ -5254,3 +5259,4 @@ for(const [id,key] of [['road-ramp','roadRamp'],['rail-ramp','railRamp'],['arch-
 $('reset-crossing-grade').addEventListener('click',()=>{editMark();applyCrossingSettings({roadRamp:22,railRamp:58,archDeckLevel:7.35});render();note('Исходный профиль подходов восстановлен.');});
 setScenario(1);
 try{let saved=JSON.parse(localStorage.getItem('trusslab-studio-project'));if(saved?.version===2&&saved.model?.nodes&&saved.foundation?.soil){st.track=saved.track==='foundation'?'foundation':'bridge';st.idx=Math.max(0,Math.min((st.track==='bridge'?BRIDGES:FOUNDATION_LEVELS).length-1,Number(saved.idx)||0));st.model=saved.model;st.foundation=saved.foundation;note('Сохранённый проект из браузера загружен.');render()}}catch(err){}
+
