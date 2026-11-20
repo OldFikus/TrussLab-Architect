@@ -1,4 +1,4 @@
-name: Build and publish TrussLab 13.0
+name: Build and publish TrussLab 14.0
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'tools/build.py'
-      - 'docs/RELEASE_13_RU.md'
+      - 'tests/test_worldeditor_core.cjs'
       - '.github/workflows/publish-release.yml'
   workflow_dispatch:
 
@@ -18,52 +18,55 @@ jobs:
     if: github.repository == 'OldFikus/TrussLab-Architect'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout current sources
+      - name: Checkout source
         uses: actions/checkout@v4
-      - name: Install Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install Node for JavaScript syntax checks
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate and build release
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Syntax checks
         run: |
-          node --check src/game.js
-          node --check src/rendercore/materials.js
-          node --check src/rendercore/capabilities.js
-          python tools/build.py
-      - name: Verify artifacts are standalone and repository stays clean
+          for file in src/game.js src/rendercore/*.js src/worldeditor*.js; do node --check "$file"; done
+      - name: WorldEditor regression tests
+        run: |
+          node tests/test_worldeditor_core.cjs
+          node tests/test_wgs84_alignment.cjs
+      - name: Build release assets
+        run: python tools/build.py
+      - name: Validate HTML and ZIPs
         run: |
           python - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
-          root = Path('dist')
-          html = root / 'TrussLab_Architect_13_0.html'
-          s = html.read_text(encoding='utf-8')
-          assert len(s) > 1500000
-          assert '<title>TrussLab Architect 13.0 — RenderCore Complete</title>' in s
-          for token in ('post-mode','water-mode','headlights-toggle','gpu-budget','region3d-open','earthworks-toggle'):
-              assert token in s, token
-          for f in ('TrussLab_Architect_13_0_Portable.zip','TrussLab_Architect_13_0_Source.zip'):
-              with ZipFile(root/f) as z: assert z.testzip() is None
-          print('Release artifacts verified:', [(p.name,p.stat().st_size) for p in root.iterdir()])
+          root=Path('dist')
+          html=root/'TrussLab_Architect_14_0.html'
+          data=html.read_text(encoding='utf8')
+          assert len(data)>1_800_000
+          assert '<title>TrussLab Architect 14.0 — WorldEditor 2</title>' in data
+          for k in ('TrussLabWorldEditorCore','worldeditor-open','we-root','region3d-open','earthworks-toggle'):
+              assert k in data,k
+          for name in ('TrussLab_Architect_14_0_Portable.zip','TrussLab_Architect_14_0_Source.zip'):
+              with ZipFile(root/name) as z: assert z.testzip() is None
+          print('WorldEditor 14.0 artifacts verified')
           PY
-      - name: Publish Release v13.0.0 (assets do not enter git)
+      - name: Publish GitHub Release v14.0.0
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v13.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'Release v13.0.0 already exists; leaving published assets unchanged.'
+          if gh release view v14.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release v14.0.0 exists. Refusing to overwrite its immutable files.'
           else
-            gh release create v13.0.0 \
-              dist/TrussLab_Architect_13_0.html \
-              dist/TrussLab_Architect_13_0_Portable.zip \
-              dist/TrussLab_Architect_13_0_Source.zip \
+            gh release create v14.0.0 \
+              dist/TrussLab_Architect_14_0.html \
+              dist/TrussLab_Architect_14_0_Portable.zip \
+              dist/TrussLab_Architect_14_0_Source.zip \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
-              --title 'TrussLab Architect 13.0 — RenderCore Complete' \
-              --notes-file docs/RELEASE_13_RU.md \
+              --title 'TrussLab Architect 14.0 — WorldEditor 2' \
+              --notes-file docs/RELEASE_14_RU.md \
               --latest
           fi
