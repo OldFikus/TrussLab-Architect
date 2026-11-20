@@ -1,15 +1,15 @@
 {
   "name": "trusslab-architect-desktop",
   "private": true,
-  "version": "11.1.0",
-  "description": "TrussLab Architect 11.1 GeoGrade: grade-limited road and rail approaches, ENU regional world",
+  "version": "12.0.0",
+  "description": "TrussLab 12 RenderCore 2: GGX direct-light BRDF, material roughness and shader fallback",
   "main": "desktop/main.cjs",
   "scripts": {
     "desktop": "electron .",
-    "test": "node tests/test_v9.mjs && node tests/test_v91.mjs && node tests/test_v92.mjs && node tests/test_v93.mjs && node tests/test_v94.mjs && node tests/test_v941.mjs && node tests/test_v942.mjs && node tests/test_v10.mjs && node tests/test_v101.mjs && node tests/test_v102.mjs && node tests/test_v103.mjs && node tests/test_v104.mjs && node tests/test_v105.mjs && node tests/test_v106.mjs && node tests/test_v107.mjs && node tests/test_v108.mjs && node tests/test_v109.mjs && node tests/test_geocore_preview.mjs && node tests/test_v11.mjs && node tests/test_v111.mjs",
+    "test": "node tests/test_v9.mjs && node tests/test_v91.mjs && node tests/test_v92.mjs && node tests/test_v93.mjs && node tests/test_v94.mjs && node tests/test_v941.mjs && node tests/test_v942.mjs && node tests/test_v10.mjs && node tests/test_v101.mjs && node tests/test_v102.mjs && node tests/test_v103.mjs && node tests/test_v104.mjs && node tests/test_v105.mjs && node tests/test_v106.mjs && node tests/test_v107.mjs && node tests/test_v108.mjs && node tests/test_v109.mjs && node tests/test_geocore_preview.mjs && node tests/test_v11.mjs && node tests/test_v111.mjs && node tests/test_v112.mjs && node tests/test_v113.mjs && node tests/test_v114.mjs && node tests/test_v115.mjs && node tests/test_v116.mjs && node tests/test_v117.mjs && node tests/test_v118.mjs && node tests/test_v119.mjs && node tests/test_v12.mjs",
     "build-html": "python build.py",
-    "test:geocore": "node tests/test_v11.mjs",
-    "test:browser": "python tests/browser_smoke_v111.py"
+    "test:geocore": "node tests/test_v11.mjs && node tests/test_v111.mjs && node tests/test_v112.mjs && node tests/test_v113.mjs && node tests/test_v114.mjs && node tests/test_v115.mjs && node tests/test_v116.mjs",
+    "test:browser": "python tests/browser_smoke_v114.py"
   },
   "devDependencies": {
     "electron": "^37.0.0"

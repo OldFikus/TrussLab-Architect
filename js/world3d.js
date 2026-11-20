@@ -1,3 +1,4 @@
+import {rendercoreDescriptor} from './rendercore_materials.js';
 import {engineerProfile,sampleEngineeredProfile,profileMetrics} from './road_grade.js';
 import {sampleGeoLand} from './geo_mask.js';
 import {sampleGshhgLand} from './gshhg_data.js';
@@ -42,11 +43,42 @@ float getShadow(){
  vec2 t=shadowTexel*.85;
  return .25*(shadowAt(sc.xy+vec2(-t.x,-t.y),sc.z)+shadowAt(sc.xy+vec2(t.x,-t.y),sc.z)+shadowAt(sc.xy+vec2(-t.x,t.y),sc.z)+shadowAt(sc.xy+vec2(t.x,t.y),sc.z));
 }
-uniform float time;uniform float dark;uniform float farScale;uniform float weather;uniform vec3 cameraPos;uniform float worldSize;uniform float coastEnabled;uniform sampler2D coastMap;uniform float exposure;
+uniform float time;uniform float dark;uniform float farScale;uniform float weather;uniform vec3 cameraPos;uniform float worldSize;uniform float coastEnabled;uniform sampler2D coastMap;uniform float exposure;uniform float materialSaturation;uniform float fogDensity;uniform float ggxEnabled;uniform float materialRoughness;
 uniform vec3 sunDirection;uniform vec3 sunColor;uniform vec3 ambientColor;uniform vec3 lampPositions[12];uniform float lampCount;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}
 float fbm(vec2 p){float a=.55,v=0.;for(int i=0;i<4;i++){v+=a*noise(p);p=p*2.03+vec2(17.6,6.4);a*=.49;}return v;}
+// RenderCore 2: Cook-Torrance GGX NDF, Smith geometry, Schlick Fresnel.
+// Approximate direct-light BRDF; there is no IBL or scanned texture pipeline.
+float ggxD(float NoH,float rough){float a=rough*rough,a2=a*a;float d=NoH*NoH*(a2-1.)+1.;return a2/max(.001,3.14159265*d*d);}
+float ggxSmith(float NoV,float NoL,float rough){float r=rough+1.,k=(r*r)/8.;float gv=NoV/max(.001,NoV*(1.-k)+k),gl=NoL/max(.001,NoL*(1.-k)+k);return gv*gl;}
+vec3 ggxFresnel(float HoV,vec3 f0){return f0+(1.-f0)*pow(clamp(1.-HoV,0.,1.),5.);}
+float pbrRoughness(float m){
+ if(m>2.5&&m<3.5)return .89; // asphalt
+ if(m>3.5&&m<4.5)return .82; // concrete
+ if(m>4.5&&m<5.5)return .37; // structural steel
+ if(m>10.5&&m<11.5)return .38; // rails
+ if(m>16.5&&m<18.5)return .48; // barriers/painted metal
+ if(m>20.5&&m<21.5)return .13; // glass/clearcoat
+ if(m>8.5&&m<9.5)return .92; // sand, gravel
+ return .94;
+}
+float pbrMetallic(float m){
+ if(m>4.5&&m<5.5)return .79;
+ if(m>10.5&&m<11.5)return .76;
+ if(m>11.5&&m<12.5)return .52;
+ if(m>16.5&&m<18.5)return .57;
+ return 0.;
+}
+vec3 ggxLight(vec3 albedo,vec3 N,vec3 V,vec3 L,float rough,float metal){
+ vec3 H=normalize(V+L);float NoL=max(dot(N,L),0.),NoV=max(dot(N,V),0.);
+ float NoH=max(dot(N,H),0.),HoV=max(dot(H,V),0.);
+ vec3 f0=mix(vec3(.04),albedo,metal),F=ggxFresnel(HoV,f0);
+ float D=ggxD(NoH,rough),G=ggxSmith(NoV,NoL,rough);
+ vec3 spec=D*G*F/max(.003,4.*NoV*NoL);
+ vec3 diff=(1.-F)*(1.-metal)*albedo/3.14159265;
+ return (diff+spec)*NoL;
+}
 vec3 pal(float m){
 if(m<.5)return vec3(.205,.31,.18); if(m<1.5)return vec3(.71,.61,.43); if(m<2.5)return vec3(.35,.27,.20);
 if(m<3.5)return vec3(.19,.22,.245);if(m<4.5)return vec3(.63,.66,.65);if(m<5.5)return vec3(.34,.40,.44);
@@ -112,7 +144,7 @@ vec3 sun=normalize(sunDirection);float lam=max(dot(N,sun),0.);
 float amb=.20+.70*lam*max(0.,sunDirection.y);
 if(weather>.5&&weather<1.5)amb=.27+.74*lam;
 if(weather>1.5)amb=.14+.34*lam;
-c*=sunColor;
+if(ggxEnabled<.5)c*=sunColor;
 if(m>17.5&&m<18.5)amb=.68+.34*lam;
 if(m>5.5&&m<6.5){amb=.81+.23*lam;
  vec3 viewDir=normalize(cameraPos-vP);float fres=pow(1.-max(0.,dot(N,viewDir)),5.);
@@ -121,9 +153,9 @@ if(m>5.5&&m<6.5){amb=.81+.23*lam;
  c+=vec3(.89,.95,.92)*spec*.30;
  }
 vec3 reflectColor=vec3(.92,.89,.80);float shine=pow(max(0.,dot(reflect(-sun,N),normalize(vec3(.23,.88,1.)))),20.);
-if(m>2.5&&m<5.6)c+=shine*.07*reflectColor;
+if(ggxEnabled<.5&&m>2.5&&m<5.6)c+=shine*.07*reflectColor;
 // Approximate microfacet metallic highlights for steel and rail surfaces.
-if((m>4.5&&m<5.6)||(m>10.5&&m<12.6)||(m>17.5&&m<18.6)){
+if(ggxEnabled<.5 && ((m>4.5&&m<5.6)||(m>10.5&&m<12.6)||(m>17.5&&m<18.6))){
  vec3 V=normalize(cameraPos-vP),H=normalize(sun+V);float nh=max(dot(N,H),0.);float ndv=max(dot(N,V),0.);
  float gloss=(m>17.5&&m<18.6)?.53:.34;
  float microSpec=pow(nh,mix(20.,90.,gloss))*(.27+.4*ndv);
@@ -132,7 +164,13 @@ if((m>4.5&&m<5.6)||(m>10.5&&m<12.6)||(m>17.5&&m<18.6)){
 if(m>25.5&&m<26.5){c=weather>1.5?vec3(.96,.72,.37):vec3(.16,.25,.34);amb=weather>1.5?1.3:.57;}
 if(m>22.5&&m<23.5){float pulse=.82+.18*sin(time*2.2+vP.x*.3+vP.z*.5);c=vec3(1.0,.82,.48)*pulse;amb=1.0;}
 if(m>24.5&&m<25.5){float pulse=.80+.20*sin(time*1.8+vP.x*.2-vP.z*.4);c=vec3(.48,.90,.60)*pulse;amb=1.0;}
-c*=amb;
+if(ggxEnabled>.5 && !(m>5.5&&m<6.5) && !(m>22.5&&m<23.5) && !(m>24.5&&m<25.5)){
+ vec3 V=normalize(cameraPos-vP),L=normalize(sunDirection);
+ float rough=clamp(pbrRoughness(m)*materialRoughness,.12,.98),metal=pbrMetallic(m);
+ vec3 ambientDiffuse=c*ambientColor*.32;
+ c=ambientDiffuse+ggxLight(c,N,V,L,rough,metal)*sunColor*2.2;
+ if(weather>1.5)c*=.55;
+}else c*=amb;
 // Cached sunlight shadow map with 4-tap PCF. The dynamic traffic buffer is not recaptured.
 if(shadowEnabled>.5&&weather<1.5 && m!=6. && m!=23. && m!=25.)c*=1.-.53*getShadow();
 // Bounded local point lighting: only the nearest 12 streetlamps are uploaded.
@@ -149,10 +187,11 @@ if(weather>1.5&&lampCount>.5 && vDist<145. && m>2.5 && !(m>5.5&&m<6.5)){
  c+=pal(m)*localLight;
 }
 if(dark>.5)c*=vec3(.83,.92,1.02);
-float fog=clamp((vDist/farScale-.28)*.64,0.,.56);
+float fog=clamp((vDist/farScale-.28)*.64*fogDensity,0.,.72);
 vec3 sky=weather<1.5?vec3(.68,.82,.88):vec3(.10,.15,.25);
 if(weather>.5&&weather<1.5)sky=vec3(.90,.69,.54);
 c=mix(c,sky,fog);
+float luma=dot(c,vec3(.2126,.7152,.0722));c=mix(vec3(luma),c,materialSaturation);
 c=max(c*exposure,vec3(0.));c=(c*(2.51*c+.03))/(c*(2.43*c+.59)+.14);gl_FragColor=vec4(pow(clamp(c,vec3(0.),vec3(1.)),vec3(.92)),1.);
 }`;
 const SKY_VS=`attribute vec2 skyPos; varying vec2 vUv; void main(){vUv=skyPos*.5+.5;gl_Position=vec4(skyPos,0.9999,1.);}`;
@@ -186,7 +225,7 @@ class Mesh{
 }
 function clampTerrain(v){return wClamp(v,-3,7)}
 export class World3D{
- constructor(canvas){this.canvas=canvas;this.gl=null;try{this.gl=canvas.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true})}catch(err){console.warn('TrussLab: browser denied WebGL, using CPU renderer.',err)}this.software=!this.gl;this.ready=true;this.ctx=this.software?canvas.getContext('2d'):null;this.yaw=-2.18;this.pitch=-.18;this.zoom=1;this.moveSpeed=1.2;this.keys={};this.quality='ultra';this.resolutionScale=1;this.stats={frames:0,fps:0,triangles:0,meshMs:0,lastMeasure:0};this.coastDirty=true;this.coastTex=null;this.daylight='day';this.sunHour=13.0;this.lampsEnabled=true;this.exposure=1.00;this.shadowsEnabled=true;this.shadowDirty=true;this.shadowSize=0;this.shadowMap=null;this.shadowFbo=null;this.shadowDepth=null;this.lastShadowDraw=-1;this.sceneDirty=true;this.bufferDirty=true;this.mapEdit=new Float32Array(65*65);this.currentKey='';this.editBridge=false;this.selectedBridgeNode=null;this.mesh=new Mesh();this.trafficMesh=new Mesh();this.settlement=new SettlementStore();this.buildingMesh=new Mesh();this.cityData=null;this.cityEnabled=true;this.cityCache=new Map();this.cityVisible=[];this.cityTilesBuilt=0;this.cityTilesUploaded=0;this.buildingCount=0;this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.placeMode=false;this.settlementSelectedId=null;this.trafficCount=0;this.trafficEnabled=!this.software;this.trafficDirty=true;this.trafficBufferDirty=true;this.trafficUpdates=0;this.staticBuilds=0;this.terrain=new Float32Array(65*65);this.paintLayer=new Uint8Array(65*65);this.brush='orbit';this.radius=4;this.theme='dark';this.time=0;this.lastState=null;this.message='';this.worldSize=72;this.map=false;this.sceneId='';this.routeOffsets=new Array(13).fill(0);this.routeExtents={x0:-118,x1:118};this.approachProfileCache=new Map();this.geoRoute=null;this.geoRouteSource=null;this.chunkSpan=35;this.chunkCache=new Map();this.visibleChunks=[];this.chunksBuilt=0;this.chunksVisible=0;this.chunkedTerrain=!this.software;this.gisMask=null;this.gisLandFeatures=0;this.gisBounds=null;this.coastMode='reference';this.geoPack=null;this.geoPackSource=null;this.demEnabled=false;this.demMetresPerUnit=8;this.roadRamp=22;this.railRamp=58;this.archDeckLevel=7.35;this.deckBaseLevel=4.3;this.drag=null;this.camPos=[0,18,72];this.animationTime=0;this.animBucket=-1;this.cameraMode='manual';this.eye=this.camPos.slice();this.focal=[0,2,0];this.initTerrain('sand');if(this.software){this.patterns=this.makePatterns();this.bindEvents();return;}try{let gl=this.gl;let prog=gl.createProgram();gl.attachShader(prog,makeShader(gl,gl.VERTEX_SHADER,VS));gl.attachShader(prog,makeShader(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));this.prog=prog;this.ap=gl.getAttribLocation(prog,'p');this.an=gl.getAttribLocation(prog,'n');this.am=gl.getAttribLocation(prog,'m');this.uvp=gl.getUniformLocation(prog,'vp');this.ut=gl.getUniformLocation(prog,'time');this.ud=gl.getUniformLocation(prog,'dark');this.uf=gl.getUniformLocation(prog,'farScale');this.uw=gl.getUniformLocation(prog,'weather');this.uc=gl.getUniformLocation(prog,'cameraPos');this.uWorldSize=gl.getUniformLocation(prog,'worldSize');this.uCoastEnabled=gl.getUniformLocation(prog,'coastEnabled');this.uCoast=gl.getUniformLocation(prog,'coastMap');this.uExposure=gl.getUniformLocation(prog,'exposure');this.uSunDir=gl.getUniformLocation(prog,'sunDirection');this.uSunColor=gl.getUniformLocation(prog,'sunColor');this.uAmbientColor=gl.getUniformLocation(prog,'ambientColor');this.uLampPositions=gl.getUniformLocation(prog,'lampPositions[0]');this.uLampCount=gl.getUniformLocation(prog,'lampCount');this.uLightVP=gl.getUniformLocation(prog,'lightVP');this.uShadowMap=gl.getUniformLocation(prog,'shadowMap');this.uShadowOn=gl.getUniformLocation(prog,'shadowEnabled');this.uShadowTexel=gl.getUniformLocation(prog,'shadowTexel');this.buffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.buildingBuffer=gl.createBuffer();this.coastTex=gl.createTexture();
+ constructor(canvas){this.canvas=canvas;this.gl=null;try{this.gl=canvas.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true})}catch(err){console.warn('TrussLab: browser denied WebGL, using CPU renderer.',err)}this.software=!this.gl;this.ready=true;this.ctx=this.software?canvas.getContext('2d'):null;this.yaw=-2.18;this.pitch=-.18;this.zoom=1;this.moveSpeed=1.2;this.keys={};this.quality='ultra';this.resolutionScale=1;this.stats={frames:0,fps:0,triangles:0,meshMs:0,lastMeasure:0};this.coastDirty=true;this.coastTex=null;this.daylight='day';this.sunHour=13.0;this.lampsEnabled=true;this.exposure=1.00;this.materialSaturation=1.0;this.fogDensity=1.0;this.ggxEnabled=true;this.materialRoughness=1.0;this.shadowsEnabled=true;this.shadowDirty=true;this.shadowSize=0;this.shadowMap=null;this.shadowFbo=null;this.shadowDepth=null;this.lastShadowDraw=-1;this.sceneDirty=true;this.bufferDirty=true;this.mapEdit=new Float32Array(65*65);this.currentKey='';this.editBridge=false;this.selectedBridgeNode=null;this.mesh=new Mesh();this.trafficMesh=new Mesh();this.settlement=new SettlementStore();this.buildingMesh=new Mesh();this.cityData=null;this.cityEnabled=true;this.cityCache=new Map();this.cityVisible=[];this.cityTilesBuilt=0;this.cityTilesUploaded=0;this.buildingCount=0;this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.placeMode=false;this.settlementSelectedId=null;this.trafficCount=0;this.trafficEnabled=!this.software;this.trafficDirty=true;this.trafficBufferDirty=true;this.trafficUpdates=0;this.staticBuilds=0;this.terrain=new Float32Array(65*65);this.paintLayer=new Uint8Array(65*65);this.brush='orbit';this.radius=4;this.theme='dark';this.time=0;this.lastState=null;this.message='';this.worldSize=72;this.map=false;this.sceneId='';this.routeOffsets=new Array(13).fill(0);this.routeExtents={x0:-118,x1:118};this.approachProfileCache=new Map();this.geoRoute=null;this.geoRouteSource=null;this.chunkSpan=35;this.chunkCache=new Map();this.visibleChunks=[];this.chunksBuilt=0;this.chunksVisible=0;this.chunkedTerrain=!this.software;this.gisMask=null;this.gisLandFeatures=0;this.gisBounds=null;this.coastMode='reference';this.geoPack=null;this.geoPackSource=null;this.demEnabled=false;this.demMetresPerUnit=8;this.roadRamp=22;this.railRamp=58;this.archDeckLevel=7.35;this.deckBaseLevel=4.3;this.drag=null;this.camPos=[0,18,72];this.animationTime=0;this.animBucket=-1;this.cameraMode='manual';this.eye=this.camPos.slice();this.focal=[0,2,0];this.initTerrain('sand');if(this.software){this.patterns=this.makePatterns();this.bindEvents();return;}try{let gl=this.gl;let prog=gl.createProgram();gl.attachShader(prog,makeShader(gl,gl.VERTEX_SHADER,VS));gl.attachShader(prog,makeShader(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));this.prog=prog;this.ap=gl.getAttribLocation(prog,'p');this.an=gl.getAttribLocation(prog,'n');this.am=gl.getAttribLocation(prog,'m');this.uvp=gl.getUniformLocation(prog,'vp');this.ut=gl.getUniformLocation(prog,'time');this.ud=gl.getUniformLocation(prog,'dark');this.uf=gl.getUniformLocation(prog,'farScale');this.uw=gl.getUniformLocation(prog,'weather');this.uc=gl.getUniformLocation(prog,'cameraPos');this.uWorldSize=gl.getUniformLocation(prog,'worldSize');this.uCoastEnabled=gl.getUniformLocation(prog,'coastEnabled');this.uCoast=gl.getUniformLocation(prog,'coastMap');this.uExposure=gl.getUniformLocation(prog,'exposure');this.uMaterialSaturation=gl.getUniformLocation(prog,'materialSaturation');this.uFogDensity=gl.getUniformLocation(prog,'fogDensity');this.uGGX=gl.getUniformLocation(prog,'ggxEnabled');this.uRoughness=gl.getUniformLocation(prog,'materialRoughness');this.uSunDir=gl.getUniformLocation(prog,'sunDirection');this.uSunColor=gl.getUniformLocation(prog,'sunColor');this.uAmbientColor=gl.getUniformLocation(prog,'ambientColor');this.uLampPositions=gl.getUniformLocation(prog,'lampPositions[0]');this.uLampCount=gl.getUniformLocation(prog,'lampCount');this.uLightVP=gl.getUniformLocation(prog,'lightVP');this.uShadowMap=gl.getUniformLocation(prog,'shadowMap');this.uShadowOn=gl.getUniformLocation(prog,'shadowEnabled');this.uShadowTexel=gl.getUniformLocation(prog,'shadowTexel');this.buffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.buildingBuffer=gl.createBuffer();this.coastTex=gl.createTexture();
 // Optional WebGL 1 shadow framebuffer; graceful fallback when GPU doesn't support it.
 try{const sh=gl.createProgram();gl.attachShader(sh,makeShader(gl,gl.VERTEX_SHADER,SHADOW_VS));gl.attachShader(sh,makeShader(gl,gl.FRAGMENT_SHADER,SHADOW_FS));gl.linkProgram(sh);
  if(gl.getProgramParameter(sh,gl.LINK_STATUS)){this.shadowProg=sh;this.shadowP=gl.getAttribLocation(sh,'p');this.shadowVP=gl.getUniformLocation(sh,'lightVP');}
@@ -241,6 +280,12 @@ setPresetCamera(kind){
  else if(kind==='kerch'){this.camPos=[-120,24,35];this.yaw=1.72;this.pitch=-.22;this.moveSpeed=1.22;}
  else if(kind==='tuzla'){this.camPos=[-18,26,33];this.yaw=1.63;this.pitch=-.34;this.moveSpeed=1.10;}
  else if(kind==='taman'){this.camPos=[106,30,42];this.yaw=-1.62;this.pitch=-.29;this.moveSpeed=1.22;}
+ else if(kind==='crimea-abutment'||kind==='taman-abutment'){
+  const b=this.kerchBounds(),west=kind==='crimea-abutment',edge=west?b.x0:b.x1;
+  const p=this.kerchSample(edge,b.roadSide),destination=[edge,p[1],p[2]];
+  this.camPos=[edge+(west?-12:12),p[1]+8,p[2]+12];
+  const d=sub(destination,this.camPos);this.yaw=Math.atan2(d[0],d[2]);this.pitch=Math.atan2(d[1],Math.hypot(d[0],d[2]));this.moveSpeed=.55;
+ }
  else if(kind==='foundation'){this.camPos=[-16,9,20];this.yaw=-2.28;this.pitch=-.22;this.moveSpeed=1.05;}
  else {this.camPos=[-22,10,28];this.yaw=-2.22;this.pitch=-.19;this.moveSpeed=1.1;}
  this.zoom=1;this.keys={};this.prevTime=0;
@@ -263,8 +308,7 @@ ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
  sample(x,z){let a=(x/this.worldSize+.5)*64,b=(z/this.worldSize+.5)*64,i=wClamp(Math.floor(a),0,63),j=wClamp(Math.floor(b),0,63),u=wClamp(a-i,0,1),v=wClamp(b-j,0,1),t=this.terrain;let h=(ii,jj)=>t[jj*65+ii];return (h(i,j)*(1-u)+h(i+1,j)*u)*(1-v)+(h(i,j+1)*(1-u)+h(i+1,j+1)*u)*v}
  start(state){this.approachProfileCache.clear();this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.sceneId=state.id||'';this.map=state.track==='bridge'&&state.id==='kerch';this.worldSize=this.map?420:state.track==='foundation'?56:Math.max(120,(state.span||40)*3.2);this.initTerrain(state.soil||'sand');this.clearTerrainChunks();if(this.map)this.mapEdit.fill(0);this.sceneDirty=true;this.coastDirty=true;this.trafficDirty=true;this.setPresetCamera(this.map?'kerch':state.track==='foundation'?'foundation':'bridge');this.currentKey='';this.render(state)}
  makeLand(m,state){let N=this.map?(this.software?34:this.chunkedTerrain?48:this.quality==='ultra'?192:this.quality==='high'?122:this.quality==='medium'?80:50):(this.software?34:this.quality==='ultra'?118:this.quality==='high'?82:51),S=this.worldSize,h=(x,z)=>this.map?this.mapHeight(x,z):this.sample(x,z);
- for(let j=0;j<N;j++)for(let i=0;i<N;i++){
- let x0=S*(i/N-.5),x1=S*((i+1)/N-.5),z0=S*(j/N-.5),z1=S*((j+1)/N-.5);
+ const drawGroundCell=(x0,x1,z0,z1,i,j)=>{
  let y0=h(x0,z0),y1=h(x1,z0),y2=h(x1,z1),y3=h(x0,z1),mid=(y0+y1+y2+y3)*.25,mat=0;
  if(this.map){mat=mid<-.9?2:mid<-.25?1:mid<.68?13:((Math.sin(x0*.075)+Math.cos(z0*.067))>-.15?13:((Math.sin(x0*.13+z0*.038)+Math.cos(z0*.28))>.5?15:0));
  if(Math.max(y0,y1,y2,y3)-Math.min(y0,y1,y2,y3)>2.1&&mid>.25)mat=9;
@@ -280,7 +324,20 @@ ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
    if(inside!==next){let t=(level-a[1])/(b[1]-a[1]);clipped.push(add(a,scale(sub(b,a),t)))}
   }
   for(let k=1;k+1<clipped.length;k++)m.triangle(clipped[0],clipped[k],clipped[k+1],mat);
- }else m.quad([x0,y0,z0],[x0,y3,z1],[x1,y2,z1],[x1,y1,z0],mat)}
+ }else m.quad([x0,y0,z0],[x0,y3,z1],[x1,y2,z1],[x1,y1,z0],mat)
+ };
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+  const x0=S*(i/N-.5),x1=S*((i+1)/N-.5),z0=S*(j/N-.5),z1=S*((j+1)/N-.5);
+  // Only road corridors need adaptive tessellation. Elsewhere keep the
+  // existing inexpensive coarse base layer.
+  const near=this.map&&this.cellNearBridgeCorridor(x0,x1,z0,z1);
+  const subdivisions=near?Math.min(8,Math.max(2,Math.ceil((x1-x0)/(this.software?2.6:1.65)))):1;
+  for(let jj=0;jj<subdivisions;jj++)for(let ii=0;ii<subdivisions;ii++){
+   const sx0=x0+(x1-x0)*ii/subdivisions,sx1=x0+(x1-x0)*(ii+1)/subdivisions;
+   const sz0=z0+(z1-z0)*jj/subdivisions,sz1=z0+(z1-z0)*(jj+1)/subdivisions;
+   drawGroundCell(sx0,sx1,sz0,sz1,i,j);
+  }
+ }
  if(this.map){let y=-1.49;
  // Use a tessellated water plane: unlike a single giant quad it also clips correctly in the CPU fallback camera.
  let wn=this.software?18:this.quality==='ultra'?52:28;
@@ -312,9 +369,7 @@ ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
  terrainTileMesh(tx,tz,lod){
   const out=new Mesh(),span=this.chunkSpan,level=-1.486;
   const h=(x,z)=>this.mapHeight(x,z)+.024;
-  for(let j=0;j<lod;j++)for(let i=0;i<lod;i++){
-   const x0=tx*span+span*i/lod,x1=tx*span+span*(i+1)/lod;
-   const z0=tz*span+span*j/lod,z1=tz*span+span*(j+1)/lod;
+  const emitCell=(x0,x1,z0,z1)=>{
    const v=[[x0,h(x0,z0),z0],[x0,h(x0,z1),z1],[x1,h(x1,z1),z1],[x1,h(x1,z0),z0]];
    const center=(v[0][1]+v[1][1]+v[2][1]+v[3][1])/4;
    let mat=center<-.9?2:center<-.22?1:center<.68?13:((Math.sin(x0*.075)+Math.cos(z0*.067))>-.15?13:15);
@@ -328,7 +383,18 @@ ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
     if(inside!==next){const t=(level-a[1])/(b[1]-a[1]);clipped.push(add(a,scale(sub(b,a),t)))}
    }
    for(let k=1;k+1<clipped.length;k++)out.triangle(clipped[0],clipped[k],clipped[k+1],mat);
+  
+  };
+  for(let j=0;j<lod;j++)for(let i=0;i<lod;i++){
+   const x0=tx*span+span*i/lod,x1=tx*span+span*(i+1)/lod;
+   const z0=tz*span+span*j/lod,z1=tz*span+span*(j+1)/lod;
+   const refine=this.cellNearBridgeCorridor(x0,x1,z0,z1);
+   const n=refine?Math.min(6,Math.max(2,Math.ceil((x1-x0)/1.60))):1;
+   for(let jj=0;jj<n;jj++)for(let ii=0;ii<n;ii++){
+    emitCell(x0+(x1-x0)*ii/n,x0+(x1-x0)*(ii+1)/n,z0+(z1-z0)*jj/n,z0+(z1-z0)*(jj+1)/n);
+   }
   }
+
   return out;
  }
  streamTerrain(maxBuild=3){
@@ -400,7 +466,8 @@ ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
  }
  setDEMEnabled(enabled){
   if(enabled&&!this.geoPack?.dem)return false;
-  if(this.demEnabled===!!enabled)return true;  this.demEnabled=!!enabled;this.invalidateTerrain();return true;
+  if(this.demEnabled===!!enabled)return true;
+  this.demEnabled=!!enabled;this.invalidateTerrain();return true;
  }
  sampleDEMMetres(x,z){return this.demEnabled?sampleDem(this.geoPack,x,z):null}
 
@@ -504,31 +571,166 @@ ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
  let terrain=base+((H(i,j)*(1-u)+H(i+1,j)*u)*(1-v)+(H(i,j+1)*(1-u)+H(i+1,j+1)*u)*v);
  return terrain;
  }
- /** The imported DEM remains untouched; mapHeight applies temporary earthworks. */
- mapHeight(x,z){
- let terrain=this.mapHeightBase(x,z);
- // Terrain cut/fill corridor: terrain moves below the designed deck, never
- // drives its longitudinal profile into jagged sawtooth bends.
- const bounds=this.kerchBounds(),within=x>=bounds.x0&&x<=bounds.x1;
- for(const isRoad of [true,false]){
-  const side=isRoad?bounds.roadSide:bounds.railSide,d=Math.abs(z-this.trackCenter(x,side));
-  const half=isRoad?2.28:1.78,outer=half+1.65;
-  const a=wClamp((outer-d)/1.65,0,1),weight=a*a*(3-2*a);
-  if(weight<=.001)continue;
-  if(within){
-   const roof=this.plannedBridgeDeck(x,isRoad)-1.90;
-   if(terrain>roof)terrain=terrain*(1-weight)+roof*weight;
-  }else if(x>=-207&&x<=207){
-   const target=this.landApproachElevation(x,side)-.24,edge=x<bounds.x0?bounds.x0:bounds.x1;
-   const dEnd=Math.abs(x-edge),v=wClamp(dEnd/9,0,1),blend=v*v*(3-2*v);
-   const cut=Math.min(terrain,this.plannedBridgeDeck(edge,isRoad)-1.90);
-   if(terrain>-1.43){
-    const filled=terrain+(target-terrain)*weight,graded=cut*(1-blend)+filled*blend;
-    terrain=terrain+(graded-terrain)*weight;
-   }else if(dEnd<9){terrain=Math.min(terrain,cut);}
+ /** GeoEarthworks 11.3 — adaptive engineering earthworks. Real DEM is immutable.
+     A compact roadbed, shaped verge and depth-dependent cut/fill daylight slope
+     replace the previous fixed-width rectangular excavation. Values are
+     visual/model parameters, not measured design slopes for the real bridge. */
+ earthworkAt(x,z,side,sourceHeight){
+  const bounds=this.kerchBounds(),isRoad=side===bounds.roadSide;
+  const deckHalf=isRoad?2.28:1.78;
+  const d=Math.abs(z-this.trackCenter(x,side));
+  const core=deckHalf+(isRoad?1.08:1.22); // paved / gravelled verge
+  const onBridge=x>=bounds.x0&&x<=bounds.x1;
+  const grade=onBridge?this.plannedBridgeDeck(x,isRoad):this.landApproachElevation(x,side);
+  let target,desired,kind='none',maxDiff=0;
+  if(onBridge){
+   // Keep bridges open; no fictional embankment beneath arches or in water.
+   target=grade-1.90;
+   desired=Math.min(sourceHeight,target);
+  }else{
+   const edge=x<bounds.x0?bounds.x0:bounds.x1;
+   const approach=wClamp(Math.abs(x-edge)/11,0,1);
+   const smooth=approach*approach*(3-2*approach);
+   target=(this.plannedBridgeDeck(edge,isRoad)-1.90)*(1-smooth)+(grade-.46)*smooth;
+   if(sourceHeight>target){desired=target;kind='cut';}
+   else if(sourceHeight>-1.43){
+    desired=Math.min(target,sourceHeight+2.7);kind='fill';
+   }else{desired=sourceHeight;kind='water';}
   }
+  maxDiff=Math.abs(sourceHeight-desired);
+  // The excavation's lateral extent depends on its *depth*: approximately
+  // 1.45 horizontal : 1 vertical in cuts, 2.1 : 1 in shallow fills.
+  // Smooth local convexity eliminates the razor-straight channel lip.
+  const runout=wClamp(2.9+maxDiff*(kind==='fill'?2.10:1.45),3.0,16);
+  const outer=core+runout;
+  let weight=d<=core?1:d>=outer?0:(outer-d)/runout;
+  weight=weight*weight*(3-2*weight);
+  const shaped=sourceHeight+(desired-sourceHeight)*weight;
+  return {height:shaped,source:sourceHeight,grade,desired,target,kind,weight,core,outer,d,depth:maxDiff,onBridge};
  }
- return terrain;
+ mapHeight(x,z){
+  const original=this.mapHeightBase(x,z),bounds=this.kerchBounds();
+  if(x< -207.1||x>207.1)return original;
+  let result=original;
+  // Both corridors are independent. For intersecting transition slopes use
+  // the lower excavation; never let a neighbouring fill bury a carriageway.
+  for(const side of [bounds.roadSide,bounds.railSide]){
+   const shape=this.earthworkAt(x,z,side,original);
+   if(shape.weight<=0)continue;
+   if(shape.height<result)result=shape.height;
+   else if(shape.kind==='fill'&&result<=original+1e-6)result=shape.height;
+  }
+  // A final exact roadbed constraint protects both deck footprints even
+  // when one berm overlaps the neighbouring road or rail cutting.
+  for(const side of [bounds.roadSide,bounds.railSide]){
+   const d=Math.abs(z-this.trackCenter(x,side));
+   if(d>=(side===bounds.roadSide?2.28:1.78)+.10)continue;
+   const shape=this.earthworkAt(x,z,side,original);
+   if(shape.onBridge||shape.kind!=='water')result=Math.min(result,shape.grade-.38);
+  }
+  return result;
+ }
+ /** GeoEarthworks Inspector 11.4. All distances are illustrative game units,
+     NOT construction volumes or geodetic quantities. This report is read-only
+     and cannot change the original Copernicus DSM. */
+ earthworkReport(step=2.4){
+  const b=this.kerchBounds(),result={};
+  for(const [name,side] of [['road',b.roadSide],['rail',b.railSide]]){
+   const r={cutLength:0,fillLength:0,waterLength:0,peakCut:0,peakFill:0,samples:0};
+   for(const [a,c] of [[-206,b.x0],[b.x1,206]]){
+    const n=Math.max(1,Math.ceil(Math.abs(c-a)/step)),dx=Math.abs(c-a)/n;
+    for(let i=0;i<n;i++){
+     const x=a+(c-a)*(i+.5)/n,z=this.trackCenter(x,side),original=this.mapHeightBase(x,z);
+     const altered=this.mapHeight(x,z),diff=original-altered;r.samples++;
+     if(original<=-1.43){r.waterLength+=dx;continue;}
+     if(diff>.16){r.cutLength+=dx;r.peakCut=Math.max(r.peakCut,diff);}
+     else if(diff<-.16){r.fillLength+=dx;r.peakFill=Math.max(r.peakFill,-diff);}
+    }
+   }
+   result[name]=r;
+  }
+  return result;
+ }
+ /** v11.6: independent 2D cross-section through engineered cut / fill.
+     Read-only diagnostics: sampling must never mutate DSM or grade profiles. */
+ earthworkCrossSection(x,side,halfSpan=17,step=.55){
+  const b=this.kerchBounds(),road=side===b.roadSide;
+  x=wClamp(x,-206,206);halfSpan=wClamp(halfSpan,5,32);step=wClamp(step,.25,3);
+  const zc=this.trackCenter(x,side),grade=this.landApproachElevation(x,side);
+  const n=Math.ceil(halfSpan*2/step),samples=[];let minClearance=Infinity,peakCut=0,peakFill=0;
+  for(let i=0;i<=n;i++){
+   const offset=-halfSpan+i*2*halfSpan/n,z=zc+offset;
+   const original=this.mapHeightBase(x,z),modified=this.mapHeight(x,z);
+   const land=original>-1.43;
+   samples.push({offset,z,original,modified,land});
+   if(Math.abs(offset)<=(road?2.28:1.78))minClearance=Math.min(minClearance,grade-modified);
+   if(land){peakCut=Math.max(peakCut,original-modified);peakFill=Math.max(peakFill,modified-original);}
+  }
+  return {x,side,mode:road?'road':'rail',grade,centerZ:zc,minClearance,peakCut,peakFill,samples};
+ }
+ /** v12.0: switch the direct-light shading model without re-uploading terrain. */
+ setRenderCore({ggx,roughness}={}){
+  if(ggx!==undefined)this.ggxEnabled=!!ggx;
+  if(roughness!==undefined){if(!Number.isFinite(roughness))throw Error('Non-finite roughness');this.materialRoughness=wClamp(roughness,.55,1.65);}
+  return {ggx:this.ggxEnabled,roughness:this.materialRoughness};
+ }
+ getMaterialDescriptor(mat){return rendercoreDescriptor(mat);}
+ /** v11.9: tone controls can be changed without uploading static meshes. */
+ setAtmosphereGrade(saturation,fog){
+  if(!Number.isFinite(saturation)||!Number.isFinite(fog))throw Error('Invalid atmosphere values');
+  this.materialSaturation=wClamp(saturation,.55,1.45);this.fogDensity=wClamp(fog,.30,2.0);
+  return {saturation:this.materialSaturation,fog:this.fogDensity};
+ }
+ /** v11.8: live CPU/GPU workload accounting, independent of the active mode.
+     These are vertex/buffer estimates, not hardware timings. */
+ performanceSnapshot(){
+  const vertices=this.mesh.a.length/7,buildings=this.buildingMesh.a.length/7,traffic=this.trafficMesh.a.length/7;
+  return {fps:this.stats.fps||0,staticBuilds:this.staticBuilds,trafficUpdates:this.trafficUpdates,
+   staticTriangles:vertices/3,buildingTriangles:buildings/3,trafficTriangles:traffic/3,
+   meshMiB:(vertices+buildings+traffic)*7*4/(1024*1024),
+   terrainChunks:this.chunksVisible,terrainCache:this.chunkCache.size,
+   bridgeStaticDirty:this.sceneDirty,terrainCacheDirty:this.bufferDirty,
+   renderer:this.software?'CPU 2.5D':'WebGL 1'};
+ }
+ /** v11.7: fast, read-only four-approach quality check. These are GAME units.
+     It detects underpasses and grades in the current mesh, not structural safety. */
+ inspectAllApproaches(step=3.0){
+  const b=this.kerchBounds(),report={version:'11.7',sampleStep:step,sections:[],warnings:[]};
+  for(const [mode,side,half] of [['road',b.roadSide,2.28],['rail',b.railSide,1.78]]){
+   for(const [shore,a,c] of [['kerch',-205,b.x0-.3],['taman',b.x1+.3,205]]){
+    const n=Math.max(1,Math.ceil((c-a)/step)),r={mode,shore,samples:0,land:0,water:0,minClearance:Infinity,maxSlope:0,peakCut:0,peakFill:0,warningPoints:[]};
+    let last=null;
+    for(let i=0;i<=n;i++){
+     const x=a+(c-a)*i/n,z=this.trackCenter(x,side),grade=this.landApproachElevation(x,side),base=this.mapHeightBase(x,z);
+     if(last)r.maxSlope=Math.max(r.maxSlope,Math.abs((grade-last.y)/(x-last.x)));
+     last={x,y:grade};r.samples++;
+     if(base<=-1.43){r.water++;continue;}r.land++;
+     r.peakCut=Math.max(r.peakCut,base-this.mapHeight(x,z));r.peakFill=Math.max(r.peakFill,this.mapHeight(x,z)-base);
+     for(const dz of [-half,0,half]){
+      const clearance=grade-this.mapHeight(x,z+dz);r.minClearance=Math.min(r.minClearance,clearance);
+      if(clearance<.28)r.warningPoints.push({x:+x.toFixed(1),dz,clearance:+clearance.toFixed(2)});
+     }
+    }
+    if(r.land===0)r.minClearance=null;
+    if(r.warningPoints.length)report.warnings.push(`${mode}/${shore}: ${r.warningPoints.length} потенциальных перекрытий`);
+    if(r.maxSlope>(mode==='road'?.205:.11))report.warnings.push(`${mode}/${shore}: предельный уклон превышен`);
+    report.sections.push(r);
+   }
+  }
+  return report;
+ }
+ /** Subdivide coarse terrain cells close to the road and the railway.
+     Otherwise 8m-wide DEM triangles can cross over even a correctly graded
+     roadbed and visually bury the road despite valid centreline clearance. */
+ cellNearBridgeCorridor(x0,x1,z0,z1){
+  if(x1< -208||x0>208)return false;
+  const mid=(x0+x1)*.5,b=this.kerchBounds();
+  for(const side of [b.roadSide,b.railSide]){
+   let lo=Infinity,hi=-Infinity;
+   for(const x of [x0,mid,x1]){const v=this.trackCenter(x,side);lo=Math.min(lo,v);hi=Math.max(hi,v);}
+   if(z1>=lo-11&&z0<=hi+11)return true;
+  }
+  return false;
  }
 
  addHouse(m,s){let f=s.foundation,L=f.length,W=f.width,gy=this.sample(0,0);let y=gy+.16,wallHeight=2.75+Math.min(5,f.floors)*1.55;
@@ -986,9 +1188,11 @@ addKerch(m,state){
  for(let bx of [archA-10,archA+6,archB-6,archB+12]){let z=this.kerchCenter(bx)+railSide,y=this.mapHeight(bx,z);m.tube([bx,Math.max(y,-1.4),z+3.2],[bx,Math.max(y,-1.4)+1.5,z+3.2],.05,18,6);m.box(bx,Math.max(y,-1.4)+1.55,z+3.2,.16,.08,.16,25);}
  // Continuous paved and railed land approaches run to the edge of the geographic window.
  this.addLandApproachCorridors(m);
+ this.addBridgeAbutments(m);
  // No static cars or train cars: all vehicles are spawned exclusively in the dynamic layer.
  }
- /** Cached grade-limited longitudinal profile for a shore and track. */
+ /** Cache a grade-limited longitudinal profile per shore and per carriageway.
+     TerraBuild, mesh generation, and 2D diagrams share exactly this geometry. */
  getLandApproachProfile(side,x){
   const b=this.kerchBounds(),left=x<b.x0,end=left?b.x0:b.x1,limit=left?-207:207;
   const road=side===b.roadSide,key=(road?'road':'rail')+':'+(left?'west':'east');
@@ -1022,7 +1226,67 @@ addKerch(m,state){
   }
   return result;
  }
- /** Grade-constrained approaches, independent of the original raster. */
+ /** Continuous verge surfaces, safety stripes and shallow drainage.
+      These share the engineered longitudinal profile instead of copying DEM noise. */
+ addApproachShoulders(m,p,q,half,rail){
+  const dx=q[0]-p[0],dz=q[2]-p[2],L=Math.hypot(dx,dz)||1;
+  const nx=-dz/L,nz=dx/L;
+  const P=(v,off,h)=>[v[0]+nx*off,v[1]+h,v[2]+nz*off];
+  const pad=rail?1.18:.90;
+  for(const sign of [-1,1]){
+   const inner=sign*(half+.025),outer=sign*(half+pad);
+   // Gravel verge: slightly below the adjoining pavement, draining outward.
+   m.quad(P(p,inner,-.046),P(q,inner,-.046),P(q,outer,-.18),P(p,outer,-.18),rail?13:9);
+   // Crisp edge band and separated gravel shoulder detail.
+   if(!rail)m.tube(P(p,inner+.10*sign,-.032),P(q,inner+.10*sign,-.032),.025,16,4);
+   else m.tube(P(p,outer,-.10),P(q,outer,-.10),.024,5,4);
+   // Sparse shallow drainage channels in land cuts; no imitation canal at sea.
+   const mx=(p[0]+q[0])/2,mz=(p[2]+q[2])/2+sign*(half+pad+.52);
+   const raw=this.mapHeightBase(mx,mz);
+   if(raw>Math.max(p[1],q[1])+.18){
+    const ditch=sign*(half+pad+.40);
+    m.tube(P(p,ditch,-.40),P(q,ditch,-.40),.047,9,4);
+   }
+  }
+ }
+
+ /** v11.5: discrete bridge abutments, transition slabs and longitudinal joints.
+     These are illustrative geometry, not surveyed structures. Water approaches
+     use piers rather than making up an island or concrete earthworks. */
+ addBridgeAbutments(m){
+  if(!this.map)return 0;
+  const b=this.kerchBounds();let built=0;
+  for(const [side,half,rail] of [[b.roadSide,2.28,false],[b.railSide,1.78,true]]){
+   for(const [edge,direction] of [[b.x0,-1],[b.x1,1]]){
+    const p=this.kerchSample(edge,side),z=p[2],y=p[1];
+    const ground=this.mapHeight(edge,z),foot=Math.max(-2.25,ground-.50);
+    const transition=edge+direction*1.05;
+    // A short composite approach slab, not an unsupported road over the shore.
+    m.box(transition,y-.31,z,2.22,.29,half*2+.70,4);
+    m.box(edge,y-.72,z,1.50,.31,half*2+.80,9);
+    // Elastomeric bearing blocks: kept beneath the girder, not above asphalt.
+    for(const dz of [-half*.52,half*.52]){
+     m.box(edge,y-.46,z+dz,.48,.13,.42,17);
+     if(y-.80>foot+.32){
+      const columnHeight=y-.80-foot;
+      m.box(edge+direction*.42,foot,z+dz,.47,columnHeight,.48,4);
+     }
+     if(ground<=-1.43)m.box(edge+direction*.42,-2.33,z+dz,.67,.32,.67,9);
+    }
+    // Transverse expansion joint + parapet ends following the deck geometry.
+    m.prismBetween([edge-.13,y+.028,z-half],[edge-.13,y+.028,z+half],.032,.052,11);
+    for(const sign of [-1,1]){
+     m.box(transition,y-.10,z+sign*(half+.22),2.12,.22,.20,4);
+     m.tube([edge-direction*.38,y+.43,z+sign*half],[transition+direction*.72,y+.43,z+sign*half],.035,18,5);
+    }
+    // Rail remains two-track and does not receive a road centre divider.
+    if(rail)for(const zOffset of [-.69,.69])m.prismBetween([edge-.23,y+.125,z+zOffset],[transition+direction*.83,y+.125,z+zOffset],.035,.080,5);
+    built++;
+   }
+  }
+  return built;
+ }
+ /** Grade-constrained approaches, separated from imported DEM for edit safety. */
  addLandApproachCorridors(m){
   if(!this.map)return;
   const b=this.kerchBounds();
@@ -1031,14 +1295,21 @@ addKerch(m,state){
    for(const [a,c] of [[-207,b.x0],[b.x1,207]]){
     const N=Math.max(1,Math.ceil(Math.abs(c-a)/1.25));
     const point=x=>[x,this.landApproachElevation(x,side),this.trackCenter(x,side)];
-    for(let i=0;i<N;i++)this.roadRibbon(m,point(a+(c-a)*i/N),point(a+(c-a)*(i+1)/N),half,rail);
+    for(let i=0;i<N;i++){
+     const p=point(a+(c-a)*i/N),q=point(a+(c-a)*(i+1)/N);
+     this.roadRibbon(m,p,q,half,rail);
+     this.addApproachShoulders(m,p,q,half,rail);
+    }
+    // Where an approaching road is above open water, retain supports instead
+    // of fabricating land; the legacy short approach ended unsupported.
     for(let x=a+2;x<c-1;x+=4.4){
-     const p=point(x),floor=this.mapHeightBase(p[0],p[2]);
-     if(floor>-1.42||p[1]-floor<.7)continue;
-     const foot=-1.58,beam=p[1]-.30;
+     const p=point(x),floor=this.mapHeight(p[0],p[2]),beam=p[1]-.34;
+     if(beam-floor<.95)continue;
+     const foot=Math.max(-1.75,floor-.35);
+     if(beam<=foot)continue;
      for(const dz of [-half*.55,half*.55]){
       m.box(x,(beam+foot)/2,p[2]+dz,.33,beam-foot,.33,4);
-      m.box(x,-1.78,p[2]+dz,.62,.25,.62,9);
+      m.box(x,foot-.10,p[2]+dz,.62,.25,.62,9);
      }
     }
    }
@@ -1317,7 +1588,7 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  gl.uniform2f(this.uShadowTexel,1/Math.max(1,this.shadowSize),1/Math.max(1,this.shadowSize));
  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.shadowMap||this.coastTex);gl.uniform1i(this.uShadowMap,1);
  let stride=28;for(let [loc,size,offset] of [[this.ap,3,0],[this.an,3,12],[this.am,1,24]]){gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,stride,offset)}
- gl.uniformMatrix4fv(this.uvp,false,new Float32Array(vp));gl.uniform1f(this.ut,performance.now()*.001);gl.uniform1f(this.ud,0);gl.uniform1f(this.uf,this.map?220:105);gl.uniform3fv(this.uc,new Float32Array(this.camPos));gl.uniform1f(this.uWorldSize,this.worldSize);gl.uniform1f(this.uCoastEnabled,this.map?1:0);gl.uniform1f(this.uExposure,(this.daylight==='night'?.95:this.daylight==='sunset'?1.08:1.15)*this.exposure);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.coastTex);gl.uniform1i(this.uCoast,0);
+ gl.uniformMatrix4fv(this.uvp,false,new Float32Array(vp));gl.uniform1f(this.ut,performance.now()*.001);gl.uniform1f(this.ud,0);gl.uniform1f(this.uf,this.map?220:105);gl.uniform3fv(this.uc,new Float32Array(this.camPos));gl.uniform1f(this.uWorldSize,this.worldSize);gl.uniform1f(this.uCoastEnabled,this.map?1:0);gl.uniform1f(this.uMaterialSaturation,this.materialSaturation);gl.uniform1f(this.uFogDensity,this.fogDensity);gl.uniform1f(this.uGGX,this.ggxEnabled?1:0);gl.uniform1f(this.uRoughness,this.materialRoughness);gl.uniform1f(this.uExposure,(this.daylight==='night'?.95:this.daylight==='sunset'?1.08:1.15)*this.exposure);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.coastTex);gl.uniform1i(this.uCoast,0);
  gl.uniform3fv(this.uSunDir,new Float32Array(rig.sun));gl.uniform3fv(this.uSunColor,new Float32Array(rig.color));
  const lights=this.nearestLampPositions(),lightsFloat=new Float32Array(36);
  for(let i=0;i<lights.length;i++)lightsFloat.set(lights[i],i*3);

@@ -171,3 +171,24 @@
 
 /* AssetStudio: readable catalogue control in regional 3D toolbar. */
 .region3d-controls select{background:#213b46;color:#eaf6f5;border:1px solid #486574;border-radius:7px;padding:7px 9px;min-width:105px;font:inherit;cursor:pointer}.region3d-controls select:focus-visible{outline:2px solid #edc578}
+
+/* 11.4: compact earthwork diagnostics within the existing grade profiler. */
+.earthworks-report{font-size:11px;line-height:1.45;padding:9px 12px;margin:7px 0 0;border-left:3px solid #dcae65;color:var(--muted,#bed0cc);background:rgba(35,75,82,.16);border-radius:4px}
+.earthworks-report[hidden]{display:none}
+/* 11.4 mobile: the old flex-nowrap view bar scrolled the whole document
+   horizontally when 2D plan controls appeared, hiding most of the map. */
+@media(max-width:600px){
+  html,body{max-width:100%;}
+  .topbar{height:auto;min-height:70px;flex-wrap:wrap;gap:7px;padding:9px 12px;}
+  .topbar .brand{flex:1 1 auto;min-width:145px;}
+  .topbar .head-actions{display:flex;flex:1 1 100%;min-width:0;flex-wrap:wrap;justify-content:stretch;}
+  .head-actions button{flex:1 1 65px;min-width:0;}
+  .tabs{overflow-x:auto;max-width:100vw;}
+  .scene-header{height:auto;min-height:80px;flex-wrap:wrap;align-items:start;gap:8px;padding:12px;}
+  .scene-header>div:first-child{width:100%;min-width:0;}
+  .views{width:100%;max-width:100%;min-width:0;flex-wrap:wrap;}
+  .views button{flex:1 1 73px;min-width:0;white-space:normal;line-height:1.25;padding:9px 5px;}
+}
+
+/* 11.6 measured longitudinal / transverse inspection */
+.cross-lab{border-top:1px solid var(--line);margin-top:10px;padding-top:9px;max-width:100%;overflow:hidden}.cross-controls{display:flex;align-items:center;flex-wrap:wrap;gap:7px 15px;font-size:11px;color:var(--sub)}.cross-controls b{color:var(--gold);font-size:10px;letter-spacing:.06em}.cross-controls label{display:flex;align-items:center;gap:7px}.cross-controls input[type=range]{width:min(190px,40vw)}.cross-controls output{min-width:27px;color:var(--gold)}#cross-section-canvas{width:100%;height:145px;border-radius:7px;display:block;background:#122e3c;margin:6px 0}.cross-footnote{font:11px system-ui;color:var(--sub);line-height:1.4}

@@ -17,13 +17,14 @@ let st={track:'bridge',idx:1,view:'3d',planMode:'section',tool:'select',material
 let initialGeoLoaded=false;
 let buildingMode='off',buildingFloors=3,buildingYaw=0,buildingCursor=null,buildingDrag=null;
 let pointerDown=null,mouse={x:0,y:0},dragging=false,saveTimer=null;let routeEdit=false,routeDragging=null,routeDiagnosticVisible=false,coastFitPreview=null;
+let earthworksOverlay=false;
 try{st.records=JSON.parse(localStorage.getItem('trusslab-studio-records')||'{}')}catch(e){}
 function scenario(){return st.track==='bridge'?BRIDGES[st.idx]:FOUNDATION_LEVELS[st.idx]}
 function resetCamera(){st.zoom=1;st.panX=0;st.panY=0;st.yaw=-.52;st.pitch=.45}
 function newFoundation(level){let L=FOUNDATION_LEVELS[level];return {soil:L.soil,type:'strip',length:L.length,width:L.width,floors:L.floors,load:Math.round(L.length*L.width*L.floors*8.5),depth:1.2,stripWidth:1.2,water:SOILS[L.soil].water,pileCount:12,pileLength:13}}
-function crossingSettings(){return {roadRamp:world3d.roadRamp,railRamp:world3d.railRamp,archDeckLevel:world3d.archDeckLevel,routeOffsets:[...world3d.routeOffsets],routeExtents:{...world3d.routeExtents}}}
+function crossingSettings(){return {roadRamp:world3d.roadRamp,railRamp:world3d.railRamp,archDeckLevel:world3d.archDeckLevel,routeOffsets:[...world3d.routeOffsets],routeExtents:{...world3d.routeExtents},atmosphere:{saturation:world3d.materialSaturation,fog:world3d.fogDensity},rendercore:{ggx:world3d.ggxEnabled,roughness:world3d.materialRoughness}}}
 function applyCrossingSettings(v){if(!v||typeof v!=='object')return;const n=(value,lo,hi,def)=>Number.isFinite(Number(value))?clamp(Number(value),lo,hi):def;
- world3d.roadRamp=n(v.roadRamp,12,52,22);world3d.railRamp=n(v.railRamp,32,90,58);world3d.archDeckLevel=n(v.archDeckLevel,6,9.5,7.35);world3d.invalidateTerrain();if(v.routeExtents)world3d.setRouteExtents(v.routeExtents);else world3d.resetRouteExtents();if(v.routeOffsets)world3d.setRouteOffsets(v.routeOffsets);else world3d.resetRoute();}
+ world3d.roadRamp=n(v.roadRamp,12,52,22);world3d.railRamp=n(v.railRamp,32,90,58);world3d.archDeckLevel=n(v.archDeckLevel,6,9.5,7.35);world3d.invalidateTerrain();if(v.routeExtents)world3d.setRouteExtents(v.routeExtents);else world3d.resetRouteExtents();if(v.routeOffsets)world3d.setRouteOffsets(v.routeOffsets);else world3d.resetRoute();if(v.atmosphere){world3d.setAtmosphereGrade(n(v.atmosphere.saturation,.55,1.45,1),n(v.atmosphere.fog,.3,2,1));if($('material-saturation'))$('material-saturation').value=Math.round(world3d.materialSaturation*100);if($('fog-density'))$('fog-density').value=Math.round(world3d.fogDensity*100);}if(v.rendercore){world3d.setRenderCore(v.rendercore);if($('material-roughness'))$('material-roughness').value=Math.round(world3d.materialRoughness*100);if($('pbr-toggle'))$('pbr-toggle').textContent=world3d.ggxEnabled?'◈ Материалы: GGX':'◈ Материалы: классика';}}
 
 const settlementActive=()=>st.track==='bridge'&&scenario()?.id==='kerch';
 function settlementEnabled(){return settlementActive()&&(st.view==='3d'||st.view==='2d'&&st.planMode==='map')}
@@ -107,6 +108,7 @@ function drawProfile(){
  ctx.fillStyle=theme==='dark'?'#b1ced2':'#476169';ctx.font='11px system-ui';
  ctx.fillText('КЕРЧЬ',42,h-7);ctx.fillText('АРКИ',X((b.archA+b.archB)/2)-14,30);ctx.fillText('ТАМАНЬ',w-95,h-7);
  for(const [side,color,name] of [[b.roadSide,'#e7b979','АВТО'],[b.railSide,'#68d6c9','Ж/Д × 2']]){
+  // Faint line: real sampled DEM, not the engineered roadway elevation.
   ctx.beginPath();for(let i=0;i<=170;i++){
    const x=xmin+(xmax-xmin)*i/170,z=world3d.trackCenter(x,side),gy=world3d.mapHeightBase(x,z);
    if(i===0)ctx.moveTo(X(x),Y(gy));else ctx.lineTo(X(x),Y(gy));
@@ -117,10 +119,29 @@ function drawProfile(){
   }ctx.strokeStyle=color;ctx.lineWidth=2.8;ctx.stroke();ctx.font='bold 11px system-ui';ctx.fillStyle=color;
   ctx.fillText(name,side<0?X(-145):X(-145)+72,14);
  }
- ctx.font='10px system-ui';ctx.fillStyle=theme==='dark'?'#91adab':'#66807b';
- if(w>660)ctx.fillText('Тонкая: DEM  ·  цветные: инженерный профиль',w*.34,h-5);
+ ctx.font='10px system-ui';ctx.fillStyle=theme==='dark'?'#91adab':'#66807b';if(w>660)ctx.fillText('Тонкая: DEM  ·  цветные: инженерный профиль',w*.34,h-5);
 }
-function syncGradeControls(){const visible=st.track==='bridge'&&scenario().id==='kerch';$('crossing-profile').hidden=!visible;if(!visible)return;for(const [id,value] of [['road-ramp',world3d.roadRamp],['rail-ramp',world3d.railRamp],['arch-level',world3d.archDeckLevel]])$(id).value=String(value);$('road-ramp-value').textContent=world3d.roadRamp.toFixed(0)+' ед.';$('rail-ramp-value').textContent=world3d.railRamp.toFixed(0)+' ед.';$('arch-level-value').textContent=world3d.archDeckLevel.toFixed(1)+' ед.';drawProfile()}
+function drawCrossSection(){
+ const c=$('cross-section-canvas'),report=$('cross-section-report');if(!c||!report||!world3d.map)return;
+ const x=Number($('cross-section-x').value),b=world3d.kerchBounds(),side=$('cross-section-mode').value==='road'?b.roadSide:b.railSide;
+ const result=world3d.earthworkCrossSection(x,side);$('cross-section-x-value').textContent=x.toFixed(0);
+ const width=Math.max(320,Math.floor(c.clientWidth||940));if(c.width!==width)c.width=width;
+ const ctx=c.getContext('2d'),W=c.width,H=c.height,padX=27,padY=21;
+ ctx.clearRect(0,0,W,H);ctx.fillStyle=theme==='dark'?'#122d3b':'#dfece9';ctx.fillRect(0,0,W,H);
+ const yValues=result.samples.flatMap(s=>[s.original,s.modified]).concat([result.grade]);
+ const minY=Math.min(...yValues)-.6,maxY=Math.max(...yValues)+.6;
+ const X=t=>padX+(t+17)/34*(W-padX*2),Y=v=>H-padY-(v-minY)/(maxY-minY||1)*(H-padY*2);
+ ctx.lineWidth=1;ctx.strokeStyle='#9caabb44';for(let j=1;j<=3;j++){let yy=j*H/4;ctx.beginPath();ctx.moveTo(padX,yy);ctx.lineTo(W-padX,yy);ctx.stroke()}
+ for(const [field,color,thickness] of [['original','#b5aaa1',1.35],['modified','#83d9a5',2.7]]){
+  ctx.beginPath();result.samples.forEach((s,i)=>{const xx=X(s.offset),yy=Y(s[field]);if(i)ctx.lineTo(xx,yy);else ctx.moveTo(xx,yy)});ctx.strokeStyle=color;ctx.lineWidth=thickness;ctx.stroke();
+ }
+ const half=result.mode==='road'?2.28:1.78;
+ ctx.fillStyle='#edc38136';ctx.fillRect(X(-half),Y(result.grade)-2,X(half)-X(-half),4);
+ ctx.beginPath();ctx.moveTo(X(-half),Y(result.grade));ctx.lineTo(X(half),Y(result.grade));ctx.strokeStyle='#f0c47c';ctx.lineWidth=3.5;ctx.stroke();
+ ctx.fillStyle=theme==='dark'?'#c9d4d3':'#405b63';ctx.font='10px system-ui';ctx.fillText('-17',padX,H-5);ctx.fillText('0',X(0)-3,H-5);ctx.fillText('+17',W-padX-20,H-5);
+ report.textContent=`${result.mode==='road'?'АВТО':'Ж/Д ×2'} · x=${result.x.toFixed(0)} · минимальный зазор ${result.minClearance.toFixed(2)} ед. · максимальный срез ${result.peakCut.toFixed(2)} · насыпь ${result.peakFill.toFixed(2)}. Серая — исходный DEM; зелёная — игровая земля; золотая — полотно.`;
+}
+function syncGradeControls(){const visible=st.track==='bridge'&&scenario().id==='kerch';$('crossing-profile').hidden=!visible;if(!visible)return;for(const [id,value] of [['road-ramp',world3d.roadRamp],['rail-ramp',world3d.railRamp],['arch-level',world3d.archDeckLevel]])$(id).value=String(value);$('road-ramp-value').textContent=world3d.roadRamp.toFixed(0)+' ед.';$('rail-ramp-value').textContent=world3d.railRamp.toFixed(0)+' ед.';$('arch-level-value').textContent=world3d.archDeckLevel.toFixed(1)+' ед.';drawProfile();refreshEarthworkReport();drawCrossSection()}
 function setScenario(i){st.idx=i;st.model=makeBridge(BRIDGES[i]||BRIDGES[0]);st.foundation=newFoundation(Math.min(i,FOUNDATION_LEVELS.length-1));st.analysis=null;st.selected=null;st.pending=null;st.hist=[];st.future=[];st.anim=0;st.loadCase='traffic';st.factor=1;resetCamera();world3d.editBridge=false;world3d.start(worldPayload());
  if(world3d.map&&!initialGeoLoaded){
   initialGeoLoaded=true;
@@ -172,7 +193,9 @@ function render(){
  $('plan-toggle').style.display=st.track==='bridge'&&sc.id==='kerch'&&st.view==='2d'?'inline-flex':'none';
  $('plan-toggle').textContent=st.planMode==='section'?'▣ План местности':'╱ Конструкция';
  $('route-edit').style.display=st.track==='bridge'&&sc.id==='kerch'&&st.view==='2d'&&st.planMode==='map'?'inline-flex':'none';
- $('route-edit').classList.toggle('selected',routeEdit);syncSettlementToolbar();syncCityToolbar();
+ $('route-edit').classList.toggle('selected',routeEdit);
+ $('earthworks-toggle').style.display=st.track==='bridge'&&sc.id==='kerch'&&st.view==='2d'&&st.planMode==='map'?'inline-flex':'none';
+ $('earthworks-toggle').classList.toggle('selected',earthworksOverlay);syncSettlementToolbar();syncCityToolbar();
  $('route-reset').style.display=st.track==='bridge'&&sc.id==='kerch'&&st.view==='2d'&&st.planMode==='map'&&routeEdit?'inline-flex':'none';
  const showFit=!!coastFitPreview?.ok&&st.track==='bridge'&&sc.id==='kerch'&&st.view==='2d'&&st.planMode==='map';
  $('route-fit-confirm').style.display=showFit?'inline-flex':'none';
@@ -287,6 +310,36 @@ function drawCityOnMap(xy){
  }
  g.restore();
 }
+function refreshEarthworkReport(){
+ const box=$('earthworks-report');if(!box)return;
+ box.hidden=!earthworksOverlay||st.track!=='bridge'||scenario()?.id!=='kerch';
+ if(box.hidden)return;
+ const stats=world3d.earthworkReport();
+ const fmt=v=>v.toFixed(1).replace('.',',');
+ box.textContent=`УСЛОВНЫЕ ЗЕМЛЯНЫЕ РАБОТЫ · АВТО: срез ${fmt(stats.road.cutLength)}, насыпь ${fmt(stats.road.fillLength)} · Ж/Д: срез ${fmt(stats.rail.cutLength)}, насыпь ${fmt(stats.rail.fillLength)} ед. длины. Это игровой расчёт, не объёмы м³ и не инженерная съёмка.`;
+}
+function drawEarthworksOnMap(xy){
+ if(!earthworksOverlay)return;
+ const b=world3d.kerchBounds(),lineA=[[-206,b.x0],[b.x1,206]];
+ // Two offset heatmap strips per line: red=cut, gold=fill, cyan=water/viaduct.
+ // Colouring only outside the bridge prevents its central bearings from being
+ // mistaken for artificial earthworks.
+ for(const [side,sign] of [[b.roadSide,-1],[b.railSide,1]]){
+  for(const [a,c] of lineA){const N=Math.max(1,Math.ceil(Math.abs(c-a)/2.8));
+   for(let i=0;i<N;i++){
+    const x=a+(c-a)*(i+.5)/N,z=world3d.trackCenter(x,side),source=world3d.mapHeightBase(x,z),newHeight=world3d.mapHeight(x,z),delta=source-newHeight;
+    let color=source<=-1.43?'#65b4da':delta>.16?'#ee7852':delta<-.16?'#ffd273':'#8b9d91';
+    const x0=a+(c-a)*i/N,x1=a+(c-a)*(i+1)/N;
+    const p=xy(x0,world3d.trackCenter(x0,side)+sign*4.1),q=xy(x1,world3d.trackCenter(x1,side)+sign*4.1);
+    g.beginPath();g.moveTo(p.x,p.y);g.lineTo(q.x,q.y);g.strokeStyle=color;g.lineWidth=5;g.stroke();
+   }
+  }
+ }
+ const y=routeDiagnosticVisible?138:59;
+ g.fillStyle='rgba(10,38,45,.91)';g.fillRect(10,y,Math.min(canvas.clientWidth-20,360),51);
+ g.font='600 11px system-ui';g.fillStyle='#ecf3ee';g.fillText('ОТКОСЫ:   красный — выемка    жёлтый — насыпь',18,y+17);
+ g.font='10px system-ui';g.fillStyle='#b7d6df';g.fillText('Голубой — вода/эстакада · расчёт в игровых единицах',18,y+34);
+}
 function drawMap2D(){
  const w=canvas.clientWidth,h=canvas.clientHeight,S=world3d.worldSize||220,half=S/2;
  const xy=(x,z)=>({x:(x+half)/S*w,y:(z+half)/S*h});
@@ -308,6 +361,7 @@ function drawMap2D(){
   g.strokeStyle=lineidx===0?'rgba(20,31,38,.88)':'rgba(18,39,43,.92)';g.lineWidth=lineidx===0?10:6;g.stroke();
   g.strokeStyle=lineidx===0?'#f0cf8a':'#d9ece7';g.lineWidth=lineidx===0?3.5:2.4;g.stroke();
  }
+ drawEarthworksOnMap(xy);
  // traffic markers (2D sync with 3D animation)
  const tt=performance.now()*.001;
  for(let i=0;i<14;i++){let dir=i%2===0?1:-1,span=bounds.x1-bounds.x0-14,base=dir>0?bounds.x0+7:bounds.x1-7,dist=((tt*(dir>0?10.5:8.8)+i*14.7)%span),x=dir>0?base+dist:base-dist,p=xy(x,world3d.trackCenter(x,bounds.roadSide)+(i%4<2?-.95:.95));g.fillStyle=['#ffffff','#e4af66','#b2d6df','#d06a55'][i%4];g.fillRect(p.x-3,p.y-1.5,6,3)}
@@ -498,6 +552,7 @@ root.addEventListener('click',e=>{let el=e.target.closest('button');if(!el)retur
  if(el.id==='building-export'){const blob=new Blob([JSON.stringify(world3d.settlement.toGeoJSON(),null,2)],{type:'application/geo+json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='TrussLab_TerraBuild_WGS84_approx.geojson';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);note('Экспорт GeoJSON создан; GPS-позиции приблизительны.','good');return;}
  if(el.id==='building-import'){$('building-import-file').click();return;}
  if(el.id==='plan-toggle'){st.planMode=st.planMode==='map'?'section':'map';render();return}
+ if(el.id==='earthworks-toggle'){earthworksOverlay=!earthworksOverlay;refreshEarthworkReport();note(earthworksOverlay?'Диагностика откосов включена. Красный — выемка, жёлтый — насыпь, голубой — вода.':'Диагностика откосов скрыта.','good');render();return}
  if(el.id==='route-edit'){selectBuildingTool('off');routeEdit=!routeEdit;note(routeEdit?'Режим трассы: перетаскивайте оранжевые точки, включая КРАЙНИЕ. Проверяйте OSM-покрытие цветными маркерами.':'Редактирование трассы завершено.');render();return}
  if(el.id==='route-reset'){editMark();world3d.resetRoute();world3d.resetRouteExtents();coastFitPreview=null;note('Ось и длина игровых подходов восстановлены к исходной форме.','good');render();return}
 
@@ -508,6 +563,11 @@ root.addEventListener('click',e=>{let el=e.target.closest('button');if(!el)retur
   syncGeoControls();world3d.render(worldPayload(),true);draw();
   note(world3d.coastMode==='osm'?'Включена OSM coastline-маска, построенная локально из настоящих OSM ways.':'Источник берегов: '+world3d.coastMode+'.', 'good');return}
  
+ if(el.id==='perf-monitor'){
+  const box=$('perf-report');box.hidden=!box.hidden;
+  if(!box.hidden){const q=world3d.performanceSnapshot();box.textContent=`ДВИЖОК: ${q.renderer} · ${q.fps} FPS · статическая сборка ×${q.staticBuilds} · движение ×${q.trafficUpdates} · статические треугольники ${Math.round(q.staticTriangles).toLocaleString('ru-RU')} · динамические ${Math.round(q.trafficTriangles).toLocaleString('ru-RU')} · буферы ≈${q.meshMiB.toFixed(2)} МиБ · тайлы ${q.terrainChunks}/${q.terrainCache}. Число FPS зависит от устройства; объём памяти — оценка для сеток.`;}
+  return;
+ }
  if(el.dataset.camera){world3d.setPresetCamera(el.dataset.camera);world3d.render(worldPayload(),false);note('Режим камеры: '+el.textContent+'.');return}
  if(el.dataset.track){st.track=el.dataset.track;setScenario(0);return}
  if(el.dataset.scenario!==undefined){setScenario(Number(el.dataset.scenario));return}
@@ -550,6 +610,28 @@ $('import-file').addEventListener('change',async e=>{
  }catch(err){note('Ошибка импорта: '+err.message,'bad')}finally{e.target.value=''}
 });
 $('brush-radius').addEventListener('input',e=>world3d.radius=Number(e.target.value));
+for(const id of ['material-saturation','fog-density'])$(id).addEventListener('input',()=>{
+ const saturation=Number($('material-saturation').value)/100,fog=Number($('fog-density').value)/100;
+ world3d.setAtmosphereGrade(saturation,fog);
+ $('material-saturation-value').textContent=Math.round(world3d.materialSaturation*100)+'%';$('fog-density-value').textContent=Math.round(world3d.fogDensity*100)+'%';
+ if(st.view==='3d')world3d.render(worldPayload(),false);else draw();
+});
+$('pbr-toggle').addEventListener('click',()=>{
+ world3d.setRenderCore({ggx:!world3d.ggxEnabled});$('pbr-toggle').textContent=world3d.ggxEnabled?'◈ Материалы: GGX':'◈ Материалы: классика';
+ if(st.view==='3d')world3d.render(worldPayload(),false);note(world3d.ggxEnabled?'GGX-визуализация включена.':'Классические отражения восстановлены.','good');
+});
+$('material-roughness').addEventListener('input',e=>{
+ world3d.setRenderCore({roughness:Number(e.target.value)/100});$('material-roughness-value').textContent=Math.round(world3d.materialRoughness*100)+'%';
+ if(st.view==='3d')world3d.render(worldPayload(),false);
+});
+$('cross-section-x').addEventListener('input',drawCrossSection);$('cross-section-mode').addEventListener('change',drawCrossSection);
+$('approach-health').addEventListener('click',()=>{
+ const r=world3d.inspectAllApproaches();const box=$('approach-health-report');box.hidden=false;
+ const rows=r.sections.map(s=>`${s.mode==='road'?'АВТО':'Ж/Д'} ${s.shore==='kerch'?'Керчь':'Тамань'}: суша ${s.land}/${s.samples}, уклон ${(s.maxSlope*100).toFixed(1)}%, мин. зазор ${s.minClearance===null?'нет данных':s.minClearance.toFixed(2)} ед.`);
+ box.textContent='ИНСПЕКТОР ПОДХОДОВ · '+rows.join(' · ')+(r.warnings.length?' · ПРОВЕРЬТЕ: '+r.warnings.join('; '):' · В контрольных точках замечаний нет.');
+ box.style.color=r.warnings.length?'#ecc38d':'#83d9a5';note(r.warnings.length?'Обнаружены точки, требующие проверки. Подробности в профиле.':'Четыре подхода прошли игровую геометрическую проверку.','good');
+});
+
 $('building-floors').addEventListener('input',e=>{buildingFloors=Number(e.target.value);$('building-floors-output').textContent=String(buildingFloors);const picked=world3d.settlement.items.find(b=>b.id===world3d.settlementSelectedId);if(picked&&['house','apartment'].includes(picked.type)){$('building-floor-hint').textContent='Для изменения этажности выбранного дома нажми «Применить этажи».';}});
 $('building-apply-floors').addEventListener('click',()=>{const item=world3d.settlement.items.find(b=>b.id===world3d.settlementSelectedId);if(!item||!['house','apartment'].includes(item.type))return;editMark();item.floors=item.type==='house'?clamp(buildingFloors,1,3):clamp(buildingFloors,2,10);world3d.settlementChanged();render();note('Этажность выбранной постройки изменена.','good');});
 $('city-import-file').addEventListener('change',async e=>{
