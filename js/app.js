@@ -23,7 +23,7 @@ function resetCamera(){st.zoom=1;st.panX=0;st.panY=0;st.yaw=-.52;st.pitch=.45}
 function newFoundation(level){let L=FOUNDATION_LEVELS[level];return {soil:L.soil,type:'strip',length:L.length,width:L.width,floors:L.floors,load:Math.round(L.length*L.width*L.floors*8.5),depth:1.2,stripWidth:1.2,water:SOILS[L.soil].water,pileCount:12,pileLength:13}}
 function crossingSettings(){return {roadRamp:world3d.roadRamp,railRamp:world3d.railRamp,archDeckLevel:world3d.archDeckLevel,routeOffsets:[...world3d.routeOffsets],routeExtents:{...world3d.routeExtents}}}
 function applyCrossingSettings(v){if(!v||typeof v!=='object')return;const n=(value,lo,hi,def)=>Number.isFinite(Number(value))?clamp(Number(value),lo,hi):def;
- world3d.roadRamp=n(v.roadRamp,12,52,22);world3d.railRamp=n(v.railRamp,32,90,58);world3d.archDeckLevel=n(v.archDeckLevel,6,9.5,7.35);if(v.routeExtents)world3d.setRouteExtents(v.routeExtents);else world3d.resetRouteExtents();if(v.routeOffsets)world3d.setRouteOffsets(v.routeOffsets);else world3d.resetRoute();}
+ world3d.roadRamp=n(v.roadRamp,12,52,22);world3d.railRamp=n(v.railRamp,32,90,58);world3d.archDeckLevel=n(v.archDeckLevel,6,9.5,7.35);world3d.invalidateTerrain();if(v.routeExtents)world3d.setRouteExtents(v.routeExtents);else world3d.resetRouteExtents();if(v.routeOffsets)world3d.setRouteOffsets(v.routeOffsets);else world3d.resetRoute();}
 
 const settlementActive=()=>st.track==='bridge'&&scenario()?.id==='kerch';
 function settlementEnabled(){return settlementActive()&&(st.view==='3d'||st.view==='2d'&&st.planMode==='map')}
@@ -95,13 +95,30 @@ function syncSettlementToolbar(){
  world3d.placeMode=settlementEnabled()&&buildingMode!=='off';
  el.querySelectorAll('[data-building]').forEach(b=>b.classList.toggle('selected',b.dataset.building===buildingMode));
 }
-function drawProfile(){const c=$('profile-canvas');if(!c||$('crossing-profile').hidden)return;const ctx=c.getContext('2d'),w=c.width,h=c.height,b=world3d.kerchBounds();ctx.clearRect(0,0,w,h);ctx.fillStyle=theme==='dark'?'#112c38':'#ecf3f1';ctx.fillRect(0,0,w,h);const X=x=>44+(x-b.x0)/(b.x1-b.x0)*(w-88),Y=y=>h-24-(y-3.8)/6.5*(h-35);
- ctx.lineWidth=1;ctx.strokeStyle=theme==='dark'?'#52717a66':'#89a9a16a';for(let i=0;i<=6;i++){let y=20+i*12;ctx.beginPath();ctx.moveTo(35,y);ctx.lineTo(w-25,y);ctx.stroke()}
- ctx.fillStyle=theme==='dark'?'#b1ced2':'#476169';ctx.font='12px system-ui';ctx.fillText('КЕРЧЬ',42,h-7);ctx.fillText('АРКИ',X((b.archA+b.archB)/2)-14,15);ctx.fillText('ТАМАНЬ',w-100,h-7);
- ctx.fillStyle='#d7b57922';ctx.fillRect(X(b.archA),9,X(b.archB)-X(b.archA),h-29);
+function drawProfile(){
+ const c=$('profile-canvas');if(!c||$('crossing-profile').hidden)return;
+ const layoutW=Math.max(320,Math.round(c.clientWidth||960));if(c.width!==layoutW)c.width=layoutW;
+ const ctx=c.getContext('2d'),w=c.width,h=c.height,b=world3d.kerchBounds();
+ const xmin=-207,xmax=207,X=x=>42+(x-xmin)/(xmax-xmin)*(w-84),Y=y=>h-23-(y+1)/19*(h-36);
+ ctx.clearRect(0,0,w,h);ctx.fillStyle=theme==='dark'?'#112c38':'#ecf3f1';ctx.fillRect(0,0,w,h);
+ ctx.strokeStyle=theme==='dark'?'#52717a50':'#89a9a160';ctx.lineWidth=1;
+ for(let j=0;j<=5;j++){let yy=15+j*14;ctx.beginPath();ctx.moveTo(36,yy);ctx.lineTo(w-22,yy);ctx.stroke()}
+ ctx.fillStyle='#d7b57922';ctx.fillRect(X(b.archA),9,X(b.archB)-X(b.archA),h-31);
+ ctx.fillStyle=theme==='dark'?'#b1ced2':'#476169';ctx.font='11px system-ui';
+ ctx.fillText('КЕРЧЬ',42,h-7);ctx.fillText('АРКИ',X((b.archA+b.archB)/2)-14,30);ctx.fillText('ТАМАНЬ',w-95,h-7);
  for(const [side,color,name] of [[b.roadSide,'#e7b979','АВТО'],[b.railSide,'#68d6c9','Ж/Д × 2']]){
- ctx.beginPath();for(let j=0;j<=180;j++){let x=b.x0+(b.x1-b.x0)*j/180,z=world3d.trackCenter(x,side),yy=world3d.kerchDeck(x,z);if(j===0)ctx.moveTo(X(x),Y(yy));else ctx.lineTo(X(x),Y(yy))}ctx.strokeStyle=color;ctx.lineWidth=3;ctx.stroke();ctx.font='bold 12px system-ui';ctx.fillStyle=color;ctx.fillText(name,side<0?150:260,18);
+  ctx.beginPath();for(let i=0;i<=170;i++){
+   const x=xmin+(xmax-xmin)*i/170,z=world3d.trackCenter(x,side),gy=world3d.mapHeightBase(x,z);
+   if(i===0)ctx.moveTo(X(x),Y(gy));else ctx.lineTo(X(x),Y(gy));
+  }ctx.strokeStyle=theme==='dark'?'#a4ad9a42':'#697c6860';ctx.lineWidth=1;ctx.stroke();
+  ctx.beginPath();for(let i=0;i<=280;i++){
+   const x=xmin+(xmax-xmin)*i/280,y=world3d.landApproachElevation(x,side);
+   if(i===0)ctx.moveTo(X(x),Y(y));else ctx.lineTo(X(x),Y(y));
+  }ctx.strokeStyle=color;ctx.lineWidth=2.8;ctx.stroke();ctx.font='bold 11px system-ui';ctx.fillStyle=color;
+  ctx.fillText(name,side<0?X(-145):X(-145)+72,14);
  }
+ ctx.font='10px system-ui';ctx.fillStyle=theme==='dark'?'#91adab':'#66807b';
+ if(w>660)ctx.fillText('Тонкая: DEM  ·  цветные: инженерный профиль',w*.34,h-5);
 }
 function syncGradeControls(){const visible=st.track==='bridge'&&scenario().id==='kerch';$('crossing-profile').hidden=!visible;if(!visible)return;for(const [id,value] of [['road-ramp',world3d.roadRamp],['rail-ramp',world3d.railRamp],['arch-level',world3d.archDeckLevel]])$(id).value=String(value);$('road-ramp-value').textContent=world3d.roadRamp.toFixed(0)+' ед.';$('rail-ramp-value').textContent=world3d.railRamp.toFixed(0)+' ед.';$('arch-level-value').textContent=world3d.archDeckLevel.toFixed(1)+' ед.';drawProfile()}
 function setScenario(i){st.idx=i;st.model=makeBridge(BRIDGES[i]||BRIDGES[0]);st.foundation=newFoundation(Math.min(i,FOUNDATION_LEVELS.length-1));st.analysis=null;st.selected=null;st.pending=null;st.hist=[];st.future=[];st.anim=0;st.loadCase='traffic';st.factor=1;resetCamera();world3d.editBridge=false;world3d.start(worldPayload());
@@ -731,7 +748,7 @@ try{let savedQuality=localStorage.getItem('trusslab-quality-v8');if(['ultra','hi
 
 for(const [id,key] of [['road-ramp','roadRamp'],['rail-ramp','railRamp'],['arch-level','archDeckLevel']]){
  const el=$(id);el.addEventListener('pointerdown',()=>editMark());
- el.addEventListener('input',()=>{world3d[key]=Number(el.value);world3d.sceneDirty=true;world3d.coastDirty=true;syncGradeControls();if(st.view==='3d')syncWorld(true);else draw();});
+ el.addEventListener('input',()=>{world3d[key]=Number(el.value);world3d.invalidateTerrain();syncGradeControls();if(st.view==='3d')syncWorld(true);else draw();});
  el.addEventListener('change',()=>{note('Продольный профиль обновлён в 2D и 3D. Параметры условные, не проектные.','good');});
 }
 $('reset-crossing-grade').addEventListener('click',()=>{editMark();applyCrossingSettings({roadRamp:22,railRamp:58,archDeckLevel:7.35});render();note('Исходный профиль подходов восстановлен.');});

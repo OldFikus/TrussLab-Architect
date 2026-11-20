@@ -1,3 +1,4 @@
+import {engineerProfile,sampleEngineeredProfile,profileMetrics} from './road_grade.js';
 import {sampleGeoLand} from './geo_mask.js';
 import {sampleGshhgLand} from './gshhg_data.js';
 import {formatLocation,sceneToGeo,geoToScene} from './georef.js';
@@ -185,7 +186,7 @@ class Mesh{
 }
 function clampTerrain(v){return wClamp(v,-3,7)}
 export class World3D{
- constructor(canvas){this.canvas=canvas;this.gl=null;try{this.gl=canvas.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true})}catch(err){console.warn('TrussLab: browser denied WebGL, using CPU renderer.',err)}this.software=!this.gl;this.ready=true;this.ctx=this.software?canvas.getContext('2d'):null;this.yaw=-2.18;this.pitch=-.18;this.zoom=1;this.moveSpeed=1.2;this.keys={};this.quality='ultra';this.resolutionScale=1;this.stats={frames:0,fps:0,triangles:0,meshMs:0,lastMeasure:0};this.coastDirty=true;this.coastTex=null;this.daylight='day';this.sunHour=13.0;this.lampsEnabled=true;this.exposure=1.00;this.shadowsEnabled=true;this.shadowDirty=true;this.shadowSize=0;this.shadowMap=null;this.shadowFbo=null;this.shadowDepth=null;this.lastShadowDraw=-1;this.sceneDirty=true;this.bufferDirty=true;this.mapEdit=new Float32Array(65*65);this.currentKey='';this.editBridge=false;this.selectedBridgeNode=null;this.mesh=new Mesh();this.trafficMesh=new Mesh();this.settlement=new SettlementStore();this.buildingMesh=new Mesh();this.cityData=null;this.cityEnabled=true;this.cityCache=new Map();this.cityVisible=[];this.cityTilesBuilt=0;this.cityTilesUploaded=0;this.buildingCount=0;this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.placeMode=false;this.settlementSelectedId=null;this.trafficCount=0;this.trafficEnabled=!this.software;this.trafficDirty=true;this.trafficBufferDirty=true;this.trafficUpdates=0;this.staticBuilds=0;this.terrain=new Float32Array(65*65);this.paintLayer=new Uint8Array(65*65);this.brush='orbit';this.radius=4;this.theme='dark';this.time=0;this.lastState=null;this.message='';this.worldSize=72;this.map=false;this.sceneId='';this.routeOffsets=new Array(13).fill(0);this.routeExtents={x0:-118,x1:118};this.geoRoute=null;this.geoRouteSource=null;this.chunkSpan=35;this.chunkCache=new Map();this.visibleChunks=[];this.chunksBuilt=0;this.chunksVisible=0;this.chunkedTerrain=!this.software;this.gisMask=null;this.gisLandFeatures=0;this.gisBounds=null;this.coastMode='reference';this.geoPack=null;this.geoPackSource=null;this.demEnabled=false;this.demMetresPerUnit=8;this.roadRamp=22;this.railRamp=58;this.archDeckLevel=7.35;this.deckBaseLevel=4.3;this.drag=null;this.camPos=[0,18,72];this.animationTime=0;this.animBucket=-1;this.cameraMode='manual';this.eye=this.camPos.slice();this.focal=[0,2,0];this.initTerrain('sand');if(this.software){this.patterns=this.makePatterns();this.bindEvents();return;}try{let gl=this.gl;let prog=gl.createProgram();gl.attachShader(prog,makeShader(gl,gl.VERTEX_SHADER,VS));gl.attachShader(prog,makeShader(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));this.prog=prog;this.ap=gl.getAttribLocation(prog,'p');this.an=gl.getAttribLocation(prog,'n');this.am=gl.getAttribLocation(prog,'m');this.uvp=gl.getUniformLocation(prog,'vp');this.ut=gl.getUniformLocation(prog,'time');this.ud=gl.getUniformLocation(prog,'dark');this.uf=gl.getUniformLocation(prog,'farScale');this.uw=gl.getUniformLocation(prog,'weather');this.uc=gl.getUniformLocation(prog,'cameraPos');this.uWorldSize=gl.getUniformLocation(prog,'worldSize');this.uCoastEnabled=gl.getUniformLocation(prog,'coastEnabled');this.uCoast=gl.getUniformLocation(prog,'coastMap');this.uExposure=gl.getUniformLocation(prog,'exposure');this.uSunDir=gl.getUniformLocation(prog,'sunDirection');this.uSunColor=gl.getUniformLocation(prog,'sunColor');this.uAmbientColor=gl.getUniformLocation(prog,'ambientColor');this.uLampPositions=gl.getUniformLocation(prog,'lampPositions[0]');this.uLampCount=gl.getUniformLocation(prog,'lampCount');this.uLightVP=gl.getUniformLocation(prog,'lightVP');this.uShadowMap=gl.getUniformLocation(prog,'shadowMap');this.uShadowOn=gl.getUniformLocation(prog,'shadowEnabled');this.uShadowTexel=gl.getUniformLocation(prog,'shadowTexel');this.buffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.buildingBuffer=gl.createBuffer();this.coastTex=gl.createTexture();
+ constructor(canvas){this.canvas=canvas;this.gl=null;try{this.gl=canvas.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true})}catch(err){console.warn('TrussLab: browser denied WebGL, using CPU renderer.',err)}this.software=!this.gl;this.ready=true;this.ctx=this.software?canvas.getContext('2d'):null;this.yaw=-2.18;this.pitch=-.18;this.zoom=1;this.moveSpeed=1.2;this.keys={};this.quality='ultra';this.resolutionScale=1;this.stats={frames:0,fps:0,triangles:0,meshMs:0,lastMeasure:0};this.coastDirty=true;this.coastTex=null;this.daylight='day';this.sunHour=13.0;this.lampsEnabled=true;this.exposure=1.00;this.shadowsEnabled=true;this.shadowDirty=true;this.shadowSize=0;this.shadowMap=null;this.shadowFbo=null;this.shadowDepth=null;this.lastShadowDraw=-1;this.sceneDirty=true;this.bufferDirty=true;this.mapEdit=new Float32Array(65*65);this.currentKey='';this.editBridge=false;this.selectedBridgeNode=null;this.mesh=new Mesh();this.trafficMesh=new Mesh();this.settlement=new SettlementStore();this.buildingMesh=new Mesh();this.cityData=null;this.cityEnabled=true;this.cityCache=new Map();this.cityVisible=[];this.cityTilesBuilt=0;this.cityTilesUploaded=0;this.buildingCount=0;this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.placeMode=false;this.settlementSelectedId=null;this.trafficCount=0;this.trafficEnabled=!this.software;this.trafficDirty=true;this.trafficBufferDirty=true;this.trafficUpdates=0;this.staticBuilds=0;this.terrain=new Float32Array(65*65);this.paintLayer=new Uint8Array(65*65);this.brush='orbit';this.radius=4;this.theme='dark';this.time=0;this.lastState=null;this.message='';this.worldSize=72;this.map=false;this.sceneId='';this.routeOffsets=new Array(13).fill(0);this.routeExtents={x0:-118,x1:118};this.approachProfileCache=new Map();this.geoRoute=null;this.geoRouteSource=null;this.chunkSpan=35;this.chunkCache=new Map();this.visibleChunks=[];this.chunksBuilt=0;this.chunksVisible=0;this.chunkedTerrain=!this.software;this.gisMask=null;this.gisLandFeatures=0;this.gisBounds=null;this.coastMode='reference';this.geoPack=null;this.geoPackSource=null;this.demEnabled=false;this.demMetresPerUnit=8;this.roadRamp=22;this.railRamp=58;this.archDeckLevel=7.35;this.deckBaseLevel=4.3;this.drag=null;this.camPos=[0,18,72];this.animationTime=0;this.animBucket=-1;this.cameraMode='manual';this.eye=this.camPos.slice();this.focal=[0,2,0];this.initTerrain('sand');if(this.software){this.patterns=this.makePatterns();this.bindEvents();return;}try{let gl=this.gl;let prog=gl.createProgram();gl.attachShader(prog,makeShader(gl,gl.VERTEX_SHADER,VS));gl.attachShader(prog,makeShader(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));this.prog=prog;this.ap=gl.getAttribLocation(prog,'p');this.an=gl.getAttribLocation(prog,'n');this.am=gl.getAttribLocation(prog,'m');this.uvp=gl.getUniformLocation(prog,'vp');this.ut=gl.getUniformLocation(prog,'time');this.ud=gl.getUniformLocation(prog,'dark');this.uf=gl.getUniformLocation(prog,'farScale');this.uw=gl.getUniformLocation(prog,'weather');this.uc=gl.getUniformLocation(prog,'cameraPos');this.uWorldSize=gl.getUniformLocation(prog,'worldSize');this.uCoastEnabled=gl.getUniformLocation(prog,'coastEnabled');this.uCoast=gl.getUniformLocation(prog,'coastMap');this.uExposure=gl.getUniformLocation(prog,'exposure');this.uSunDir=gl.getUniformLocation(prog,'sunDirection');this.uSunColor=gl.getUniformLocation(prog,'sunColor');this.uAmbientColor=gl.getUniformLocation(prog,'ambientColor');this.uLampPositions=gl.getUniformLocation(prog,'lampPositions[0]');this.uLampCount=gl.getUniformLocation(prog,'lampCount');this.uLightVP=gl.getUniformLocation(prog,'lightVP');this.uShadowMap=gl.getUniformLocation(prog,'shadowMap');this.uShadowOn=gl.getUniformLocation(prog,'shadowEnabled');this.uShadowTexel=gl.getUniformLocation(prog,'shadowTexel');this.buffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.buildingBuffer=gl.createBuffer();this.coastTex=gl.createTexture();
 // Optional WebGL 1 shadow framebuffer; graceful fallback when GPU doesn't support it.
 try{const sh=gl.createProgram();gl.attachShader(sh,makeShader(gl,gl.VERTEX_SHADER,SHADOW_VS));gl.attachShader(sh,makeShader(gl,gl.FRAGMENT_SHADER,SHADOW_FS));gl.linkProgram(sh);
  if(gl.getProgramParameter(sh,gl.LINK_STATUS)){this.shadowProg=sh;this.shadowP=gl.getAttribLocation(sh,'p');this.shadowVP=gl.getUniformLocation(sh,'lightVP');}
@@ -260,7 +261,7 @@ ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
  initTerrain(soil){for(let z=0;z<65;z++)for(let x=0;x<65;x++){let i=z*65+x;this.terrain[i]=0.22*Math.sin(x*.28)*Math.cos(z*.31)+.12*Math.sin(z*.61+x*.18);this.paintLayer[i]=['peat','clay','loam','fill'].includes(soil)?2:['sand','silt'].includes(soil)?1:['gravel','rock'].includes(soil)?3:0}}
  getSize(){return this.worldSize}
  sample(x,z){let a=(x/this.worldSize+.5)*64,b=(z/this.worldSize+.5)*64,i=wClamp(Math.floor(a),0,63),j=wClamp(Math.floor(b),0,63),u=wClamp(a-i,0,1),v=wClamp(b-j,0,1),t=this.terrain;let h=(ii,jj)=>t[jj*65+ii];return (h(i,j)*(1-u)+h(i+1,j)*u)*(1-v)+(h(i,j+1)*(1-u)+h(i+1,j+1)*u)*v}
- start(state){this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.sceneId=state.id||'';this.map=state.track==='bridge'&&state.id==='kerch';this.worldSize=this.map?420:state.track==='foundation'?56:Math.max(120,(state.span||40)*3.2);this.initTerrain(state.soil||'sand');this.clearTerrainChunks();if(this.map)this.mapEdit.fill(0);this.sceneDirty=true;this.coastDirty=true;this.trafficDirty=true;this.setPresetCamera(this.map?'kerch':state.track==='foundation'?'foundation':'bridge');this.currentKey='';this.render(state)}
+ start(state){this.approachProfileCache.clear();this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.sceneId=state.id||'';this.map=state.track==='bridge'&&state.id==='kerch';this.worldSize=this.map?420:state.track==='foundation'?56:Math.max(120,(state.span||40)*3.2);this.initTerrain(state.soil||'sand');this.clearTerrainChunks();if(this.map)this.mapEdit.fill(0);this.sceneDirty=true;this.coastDirty=true;this.trafficDirty=true;this.setPresetCamera(this.map?'kerch':state.track==='foundation'?'foundation':'bridge');this.currentKey='';this.render(state)}
  makeLand(m,state){let N=this.map?(this.software?34:this.chunkedTerrain?48:this.quality==='ultra'?192:this.quality==='high'?122:this.quality==='medium'?80:50):(this.software?34:this.quality==='ultra'?118:this.quality==='high'?82:51),S=this.worldSize,h=(x,z)=>this.map?this.mapHeight(x,z):this.sample(x,z);
  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
  let x0=S*(i/N-.5),x1=S*((i+1)/N-.5),z0=S*(j/N-.5),z1=S*((j+1)/N-.5);
@@ -466,7 +467,7 @@ ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
   const n=256,ix=wClamp(Math.floor((x/this.worldSize+.5)*n),0,n-1),iz=wClamp(Math.floor((z/this.worldSize+.5)*n),0,n-1);
   return this.gisMask[iz*n+ix]?1:0;
  }
- mapHeight(x,z){
+ mapHeightBase(x,z){
  // The full plateau now contains curved, different western/eastern banks.
  const crimeaEdge=coastShore(z,CRIMEA_COAST)+shoreNoise(-150,z);
  const tamanEdge=coastShore(z,TAMAN_COAST)+shoreNoise(145,z)*.92;
@@ -501,19 +502,30 @@ ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
  // The editable delta field is the same input that both 2D and 3D reference.
  let a=(x/this.worldSize+.5)*64,b=(z/this.worldSize+.5)*64,i=wClamp(Math.floor(a),0,63),j=wClamp(Math.floor(b),0,63),u=wClamp(a-i,0,1),v=wClamp(b-j,0,1),t=this.mapEdit,H=(ix,iz)=>t[iz*65+ix];
  let terrain=base+((H(i,j)*(1-u)+H(i+1,j)*u)*(1-v)+(H(i,j+1)*(1-u)+H(i+1,j+1)*u)*v);
+ return terrain;
+ }
+ /** The imported DEM remains untouched; mapHeight applies temporary earthworks. */
+ mapHeight(x,z){
+ let terrain=this.mapHeightBase(x,z);
  // Terrain cut/fill corridor: terrain moves below the designed deck, never
  // drives its longitudinal profile into jagged sawtooth bends.
- const bounds=this.kerchBounds(),center=this.kerchCenter(x);
- if(x>=bounds.x0-4&&x<=bounds.x1+4){
-  for(const isRoad of [true,false]){
-   const side=isRoad?bounds.roadSide:bounds.railSide;
-   const d=Math.abs(z-this.trackCenter(x,side));
-   const a=wClamp((5.1-d)/2.8,0,1);
-   const weight=a*a*(3-2*a);
-   if(weight>.001){
-    const roof=this.plannedBridgeDeck(x,isRoad)-1.90;
-    if(terrain>roof)terrain=terrain*(1-weight)+roof*weight;
-   }
+ const bounds=this.kerchBounds(),within=x>=bounds.x0&&x<=bounds.x1;
+ for(const isRoad of [true,false]){
+  const side=isRoad?bounds.roadSide:bounds.railSide,d=Math.abs(z-this.trackCenter(x,side));
+  const half=isRoad?2.28:1.78,outer=half+1.65;
+  const a=wClamp((outer-d)/1.65,0,1),weight=a*a*(3-2*a);
+  if(weight<=.001)continue;
+  if(within){
+   const roof=this.plannedBridgeDeck(x,isRoad)-1.90;
+   if(terrain>roof)terrain=terrain*(1-weight)+roof*weight;
+  }else if(x>=-207&&x<=207){
+   const target=this.landApproachElevation(x,side)-.24,edge=x<bounds.x0?bounds.x0:bounds.x1;
+   const dEnd=Math.abs(x-edge),v=wClamp(dEnd/9,0,1),blend=v*v*(3-2*v);
+   const cut=Math.min(terrain,this.plannedBridgeDeck(edge,isRoad)-1.90);
+   if(terrain>-1.43){
+    const filled=terrain+(target-terrain)*weight,graded=cut*(1-blend)+filled*blend;
+    terrain=terrain+(graded-terrain)*weight;
+   }else if(dEnd<9){terrain=Math.min(terrain,cut);}
   }
  }
  return terrain;
@@ -715,7 +727,7 @@ kerchBounds(){return {x0:this.routeExtents.x0,x1:this.routeExtents.x1,roadSide:-
   this.invalidateTerrain();return true;
  }
  resetRoute(){this.setRouteOffsets(new Array(this.routeOffsets.length).fill(0));}
- invalidateTerrain(){this.clearCityTiles();this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.sceneDirty=true;this.bufferDirty=true;this.shadowDirty=true;this.coastDirty=true;this.clearTerrainChunks();}
+ invalidateTerrain(){this.approachProfileCache?.clear();this.clearCityTiles();this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.sceneDirty=true;this.bufferDirty=true;this.shadowDirty=true;this.coastDirty=true;this.clearTerrainChunks();}
  kerchBaseCenter(x){return -3.2+5.0*Math.sin((x+30)*.024)+1.35*Math.sin(x*.062)}
  kerchCenter(x){return this.kerchBaseWithGeo(x)+this.routeOffset(x)}
 plannedBridgeDeck(x,isRoad){
@@ -976,26 +988,62 @@ addKerch(m,state){
  this.addLandApproachCorridors(m);
  // No static cars or train cars: all vehicles are spawned exclusively in the dynamic layer.
  }
- /** Land sections beyond the bridge endpoints, shaped by the imported DSM. */
+ /** Cached grade-limited longitudinal profile for a shore and track. */
+ getLandApproachProfile(side,x){
+  const b=this.kerchBounds(),left=x<b.x0,end=left?b.x0:b.x1,limit=left?-207:207;
+  const road=side===b.roadSide,key=(road?'road':'rail')+':'+(left?'west':'east');
+  if(!this.approachProfileCache)this.approachProfileCache=new Map();
+  if(!this.approachProfileCache.has(key)){
+   const initialHeight=this.plannedBridgeDeck(end,road);
+   const sampled=x=>this.mapHeightBase(x,this.trackCenter(x,side));
+   const valid=x=>{
+    const z=this.trackCenter(x,side),polys=this.sampleLandMask(x,z);
+    if(polys!==null)return polys>=.5;
+    if(this.coastMode==='osm'&&this.geoPack?.coast)return sampleCoast(this.geoPack,x,z)>=.45;
+    return sampled(x)>-1.30;
+   };
+   const profile=engineerProfile({startX:end,endX:limit,initialHeight,terrainAt:sampled,landAt:valid,road});
+   this.approachProfileCache.set(key,profile);
+  }
+  return this.approachProfileCache.get(key);
+ }
+ landApproachElevation(x,side){
+  const b=this.kerchBounds();
+  if(x>=b.x0&&x<=b.x1)return this.kerchSample(x,side)[1];
+  return sampleEngineeredProfile(this.getLandApproachProfile(side,x),x);
+ }
+ approachGradeDiagnostics(){
+  const b=this.kerchBounds(),result={};
+  for(const [mode,side] of [['road',b.roadSide],['rail',b.railSide]]){
+   result[mode]={};
+   for(const [end,x] of [['kerch',b.x0-1],['taman',b.x1+1]]){
+    result[mode][end]=profileMetrics(this.getLandApproachProfile(side,x));
+   }
+  }
+  return result;
+ }
+ /** Grade-constrained approaches, independent of the original raster. */
  addLandApproachCorridors(m){
   if(!this.map)return;
-  const b=this.kerchBounds(),smooth=t=>{t=wClamp(t,0,1);return t*t*(3-2*t);};
+  const b=this.kerchBounds();
   for(const side of [b.roadSide,b.railSide]){
-   const rail=side>0,half=rail?1.78:2.28;
-   for(const [a,c,from] of [[-207,b.x0,b.x0],[b.x1,207,b.x1]]){
-    const dist=Math.abs(c-a),N=Math.ceil(dist/1.25);if(N<1)continue;
-    const point=x=>{
-     const z=this.trackCenter(x,side),terrain=this.mapHeight(x,z);
-     const near=smooth(Math.abs(x-from)/16.0);
-     const y=lerp(this.kerchSample(from,side)[1],terrain+.15,near);
-     return [x,y,z];
-    };
-    for(let i=0;i<N;i++)this.roadRibbon(m,point(lerp(a,c,i/N)),point(lerp(a,c,(i+1)/N)),half,rail);
+   const rail=side===b.railSide,half=rail?1.78:2.28;
+   for(const [a,c] of [[-207,b.x0],[b.x1,207]]){
+    const N=Math.max(1,Math.ceil(Math.abs(c-a)/1.25));
+    const point=x=>[x,this.landApproachElevation(x,side),this.trackCenter(x,side)];
+    for(let i=0;i<N;i++)this.roadRibbon(m,point(a+(c-a)*i/N),point(a+(c-a)*(i+1)/N),half,rail);
+    for(let x=a+2;x<c-1;x+=4.4){
+     const p=point(x),floor=this.mapHeightBase(p[0],p[2]);
+     if(floor>-1.42||p[1]-floor<.7)continue;
+     const foot=-1.58,beam=p[1]-.30;
+     for(const dz of [-half*.55,half*.55]){
+      m.box(x,(beam+foot)/2,p[2]+dz,.33,beam-foot,.33,4);
+      m.box(x,-1.78,p[2]+dz,.62,.25,.62,9);
+     }
+    }
    }
   }
  }
-
-
 
  // Editable user-built structures. Each is generated into its own cached VBO,
  // independent of terrain, bridge deck and 18 Hz traffic updates.
@@ -1318,7 +1366,7 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  const streamed=this.streamTerrain(4);
  if(moved||streamed||this.sceneDirty||this.trafficDirty||this.daylight!=='night'&&t-this.lastDraw>(this.quality==='ultra'?28:this.quality==='high'?40:this.quality==='medium'?85:160)){this.render(this.lastState,this.sceneDirty);this.lastDraw=t}
  }
- brushAt(pos,mode,r){let w=this.worldSize,x=pos[0],z=pos[2];let cx=(x/w+.5)*64,cz=(z/w+.5)*64,rx=r/w*64;let newVals=[];for(let j=Math.max(1,Math.floor(cz-rx-1));j<=Math.min(63,Math.ceil(cz+rx+1));j++)for(let i=Math.max(1,Math.floor(cx-rx-1));i<=Math.min(63,Math.ceil(cx+rx+1));i++){let d=Math.hypot(i-cx,j-cz);if(d>rx)continue;let idx=j*65+i,wt=(1-d/Math.max(rx,.01))*.24;let t=this.map?this.mapEdit:this.terrain;if(mode==='raise')t[idx]=clampTerrain(t[idx]+wt);if(mode==='lower')t[idx]=clampTerrain(t[idx]-wt);if(mode==='smooth'){let near=(t[idx-1]+t[idx+1]+t[idx-65]+t[idx+65])/4;newVals.push([idx,t[idx]*(1-wt)+near*wt])}if(mode==='paint-grass')this.paintLayer[idx]=0;if(mode==='paint-sand')this.paintLayer[idx]=1;if(mode==='paint-rock')this.paintLayer[idx]=3;if(mode==='paint-asphalt')this.paintLayer[idx]=4}newVals.forEach(([idx,v])=>(this.map?this.mapEdit:this.terrain)[idx]=v);this.sceneDirty=true;this.coastDirty=true;if(this.map)this.clearTerrainChunks()}
+ brushAt(pos,mode,r){let w=this.worldSize,x=pos[0],z=pos[2];let cx=(x/w+.5)*64,cz=(z/w+.5)*64,rx=r/w*64;let newVals=[];for(let j=Math.max(1,Math.floor(cz-rx-1));j<=Math.min(63,Math.ceil(cz+rx+1));j++)for(let i=Math.max(1,Math.floor(cx-rx-1));i<=Math.min(63,Math.ceil(cx+rx+1));i++){let d=Math.hypot(i-cx,j-cz);if(d>rx)continue;let idx=j*65+i,wt=(1-d/Math.max(rx,.01))*.24;let t=this.map?this.mapEdit:this.terrain;if(mode==='raise')t[idx]=clampTerrain(t[idx]+wt);if(mode==='lower')t[idx]=clampTerrain(t[idx]-wt);if(mode==='smooth'){let near=(t[idx-1]+t[idx+1]+t[idx-65]+t[idx+65])/4;newVals.push([idx,t[idx]*(1-wt)+near*wt])}if(mode==='paint-grass')this.paintLayer[idx]=0;if(mode==='paint-sand')this.paintLayer[idx]=1;if(mode==='paint-rock')this.paintLayer[idx]=3;if(mode==='paint-asphalt')this.paintLayer[idx]=4}newVals.forEach(([idx,v])=>(this.map?this.mapEdit:this.terrain)[idx]=v);this.sceneDirty=true;this.coastDirty=true;if(this.map){this.approachProfileCache.clear();this.clearTerrainChunks()}}
  rayGround(px,py){let w=this.canvas.clientWidth,h=this.canvas.clientHeight;if(!w||!h)return null;let eye=this.eye,{forward,right,up}=this.cameraBasis(),a=(px/w*2-1)*Math.tan(Math.PI/6)*w/h,b=(1-py/h*2)*Math.tan(Math.PI/6),d=norm(add(add(scale(right,a),scale(up,b)),forward));if(Math.abs(d[1])<1e-5)return null;let t=(0-eye[1])/d[1];if(t<0)return null;let p=add(eye,scale(d,t));if(Math.abs(p[0])>this.worldSize*.5||Math.abs(p[2])>this.worldSize*.5)return null;return p}
  rayTerrain(px,py){
   const w=this.canvas.clientWidth,h=this.canvas.clientHeight;if(!w||!h)return null;
