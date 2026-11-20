@@ -1,0 +1,18 @@
+{
+  "name": "trusslab-architect-desktop",
+  "private": true,
+  "version": "11.0.0",
+  "description": "TrussLab Architect 11.0 GeoCore 2: HTML-first 3D streamed regional DEM/city tiles, floating-origin WebGL1, metric ground scale and WebGPU capability probe",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "desktop": "electron .",
+    "test": "node tests/test_v9.mjs && node tests/test_v91.mjs && node tests/test_v92.mjs && node tests/test_v93.mjs && node tests/test_v94.mjs && node tests/test_v941.mjs && node tests/test_v942.mjs && node tests/test_v10.mjs && node tests/test_v101.mjs && node tests/test_v102.mjs && node tests/test_v103.mjs && node tests/test_v104.mjs && node tests/test_v105.mjs && node tests/test_v106.mjs && node tests/test_v107.mjs && node tests/test_v108.mjs && node tests/test_v109.mjs && node tests/test_geocore_preview.mjs && node tests/test_v11.mjs",
+    "build-html": "python build.py",
+    "test:geocore": "node tests/test_v11.mjs",
+    "test:browser": "python tests/browser_smoke_v11.py"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0"
+  },
+  "type": "module"
+}
