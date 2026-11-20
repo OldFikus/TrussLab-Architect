@@ -1,0 +1,27 @@
+name: Keep historical release descriptions consistent
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/RELEASE_13_RU.md'
+      - 'docs/RELEASE_14_RU.md'
+      - 'docs/RELEASE_15_RU.md'
+      - '.github/workflows/sync-release-descriptions.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update only release descriptions, preserve assets and tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit v13.0.0 --repo "$GITHUB_REPOSITORY" --title 'TrussLab Architect 13.0 — RenderCore 2' --notes-file docs/RELEASE_13_RU.md
+          gh release edit v14.0.0 --repo "$GITHUB_REPOSITORY" --title 'TrussLab Architect 14.0 — WorldEditor 2' --notes-file docs/RELEASE_14_RU.md
+          gh release edit v15.0.0 --repo "$GITHUB_REPOSITORY" --title 'TrussLab Architect 15.0 — InfrastructureSim' --notes-file docs/RELEASE_15_RU.md
