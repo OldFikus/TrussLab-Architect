@@ -7,7 +7,8 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'src'
 DIST = ROOT / 'dist'
-VERSION = '17.9'
+VERSION = '17.0'
+SERIES = 'PlanetStream'
 GROUPS = {
     'STYLES': 'style.css worldeditor.css infrastructure.css citysim_plus.css world_visual.css nature.css quality_ui.css',
     'SCRIPT': 'planetstream.js rendercore/materials.js rendercore/capabilities.js game.js worldeditor_core.js worldeditor_ui.js worldeditor_region3d.js infrastructure_core.js infrastructure_ui.js',
@@ -31,7 +32,7 @@ def build():
             flag = "const optInBalanced=gpuQuery.get('trussBalanced')==='1';"
             assert page.count(flag) == 1
             page = page.replace(flag, "const optInBalanced=gpuQuery.get('trussBalanced')!=='0';")
-        title = f'TrussLab Architect {VERSION} — PlanetStream · GPU Clarity {profile}'
+        title = f'TrussLab Architect {VERSION} — {SERIES} · GPU Clarity {profile}'
         page = page.replace('TrussLab Architect 16.0 — GPU Clarity SAFE · 1080p / 1440p</title>', title + '</title>')
         path = DIST / f'TrussLab_{VERSION}_{profile}.html'
         path.write_text(page)

@@ -1,4 +1,4 @@
-name: Test and publish PlanetStream
+name: Test and publish TrussLab
 on:
   push:
     branches: [main]
@@ -40,7 +40,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(python -c 'from tools.build import VERSION; print(VERSION)')
-          tag="v${version}.0"
+          series=$(python -c 'from tools.build import SERIES; print(SERIES)')
+          notes="docs/${series^^}_RU.md"
+          tag="v${version}.0" 
           if ! gh release view "$tag" >/dev/null 2>&1; then
-            gh release create "$tag" dist/* --target "$GITHUB_SHA" --title "TrussLab Architect $version — PlanetStream" --notes-file docs/PLANETSTREAM_RU.md
+            gh release create "$tag" dist/* --target "$GITHUB_SHA" --title "TrussLab Architect $version — $series" --notes-file "$notes"
           fi
