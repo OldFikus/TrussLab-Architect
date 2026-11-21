@@ -8,7 +8,9 @@
   function current(){return models[select.selectedIndex];}
   function draw(){
     const m=current(),bin=aDecode64(m.variants.high),view=new DataView(bin.buffer,bin.byteOffset,bin.byteLength);
-    const start=28+view.getUint32(12,true),coords=new Float32Array(bin.buffer,bin.byteOffset+start);
+    const jsonSize=view.getUint32(12,true),start=28+jsonSize;
+    const doc=JSON.parse(new TextDecoder().decode(bin.subarray(20,20+jsonSize)));
+    const coords=new Float32Array(bin.buffer,bin.byteOffset+start,doc.accessors[0].count*3);
     const theta=Number(angle.value)*Math.PI/180,c=Math.cos(theta),s=Math.sin(theta),faces=[];
     const scale=205/Math.max(m.width,m.depth,m.height);
     for(let i=0;i<coords.length;i+=9){

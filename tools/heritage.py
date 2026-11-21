@@ -3,6 +3,8 @@ import base64
 import json
 import math
 import struct
+import random
+import zlib
 
 BASE='https://archaeolog.ru/media/periodicals/agis/AGIS-4/Presentations/Smekalov/mondeskr/'
 MONUMENTS=[
@@ -45,6 +47,20 @@ def geometry(m):
     return points
 
 
+def limestone(seed):
+    rng=random.Random(seed)
+    rows=bytearray()
+    for y in range(64):
+        rows.append(0)
+        for x in range(64):
+            joint=y%16==0 or (x+(y//16%2)*16)%32==0
+            value=(133 if joint else 198)+rng.randrange(-11,12)
+            rows.extend([value,value-12,value-34])
+    def chunk(kind,body):
+        return struct.pack('>I',len(body))+kind+body+struct.pack('>I',zlib.crc32(kind+body)&0xffffffff)
+    return b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',64,64,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(rows))+chunk(b'IEND',b'')
+
+
 def glb(points,label):
     binary=b''.join(struct.pack('<3f',*point) for point in points)
     axes=list(zip(*points))
@@ -53,6 +69,24 @@ def glb(points,label):
               materials=[dict(name='Limestone',doubleSided=True,pbrMetallicRoughness=dict(baseColorFactor=[.76,.69,.55,1],metallicFactor=0,roughnessFactor=.9))],
               buffers=[dict(byteLength=len(binary))],bufferViews=[dict(buffer=0,byteLength=len(binary),target=34962)],
               accessors=[dict(bufferView=0,componentType=5126,count=len(points),type='VEC3',min=list(map(min,axes)),max=list(map(max,axes)))])
+    offset=len(binary)
+    uv=bytearray()
+    for i in range(0,len(points),3):
+        a,b,c=points[i:i+3]
+        ab=[b[j]-a[j] for j in range(3)];ac=[c[j]-a[j] for j in range(3)]
+        normal=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]]
+        axis=max(range(3),key=lambda j:abs(normal[j]))
+        u,v=[j for j in range(3) if j!=axis]
+        for pt in (a,b,c):uv.extend(struct.pack('<2f',pt[u]/2,pt[v]/2))
+    image=limestone(label)
+    data['bufferViews'].extend([dict(buffer=0,byteOffset=offset,byteLength=len(uv),target=34962),
+                                dict(buffer=0,byteOffset=offset+len(uv),byteLength=len(image))])
+    data['accessors'].append(dict(bufferView=1,componentType=5126,count=len(points),type='VEC2'))
+    data['meshes'][0]['primitives'][0]['attributes']['TEXCOORD_0']=1
+    data['images']=[dict(bufferView=2,mimeType='image/png')]
+    data['textures']=[dict(source=0)]
+    data['materials'][0]['pbrMetallicRoughness']['baseColorTexture']={'index':0}
+    binary+=uv+image;data['buffers'][0]['byteLength']=len(binary);binary+=b'\x00'*(-len(binary)%4)
     meta=json.dumps(data,separators=(',',':')).encode()
     meta+=b' '*(-len(meta)%4)
     return struct.pack('<4sII',b'glTF',2,28+len(meta)+len(binary))+struct.pack('<I4s',len(meta),b'JSON')+meta+struct.pack('<I4s',len(binary),b'BIN\x00')+binary

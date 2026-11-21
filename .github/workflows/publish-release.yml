@@ -32,6 +32,7 @@ jobs:
           python -m pip install playwright -r tools/requirements-region.txt
           python -m playwright install --with-deps chromium
           python tests/test_planetstream.py
+          python tests/test_heritage.py
           python tests/test_region_import.py
           python tests/test_planet_stress.py
           for archive in dist/*.zip; do unzip -tq "$archive"; done
