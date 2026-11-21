@@ -1,0 +1,20 @@
+/* NatureWorld 16.x – responsive controls, zero dependencies. */
+#nw-panel{margin:10px 0 5px;border:1px solid #6c967c;border-radius:9px;background:#122d2e;padding:10px;color:#dceee4}
+#nw-panel>summary{cursor:pointer;font-weight:750;font-size:12px;color:#bde5b6;padding:4px 0;touch-action:manipulation}
+#nw-panel p.nw-precise{font-size:11px;color:#bbd1c8;line-height:1.5;margin:6px 0 10px}
+#nw-panel .nw-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#nw-panel label{display:block;color:#c3d8cf;font-size:11px}
+#nw-panel select,#nw-panel input[type=number],#nw-panel input[type=range]{display:block;margin-top:5px;width:100%;min-width:0;max-width:100%;background:#153b3c;color:#ecf4e8;border:1px solid #568477;border-radius:6px;padding:6px 4px}
+#nw-panel input[type=range]{accent-color:#bfd68b}
+#nw-panel output{font-size:10px}
+#nw-panel .nw-opts{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0}
+#nw-panel .nw-opts label{display:flex;align-items:center;gap:5px}#nw-panel .nw-opts input{accent-color:#a6c78d}
+#nw-panel .nw-buttons{display:flex;gap:5px;margin:8px 0;flex-wrap:wrap}
+#nw-panel button{min-height:33px;flex:1;white-space:normal;background:#28584b;color:#e9f7e5;border:1px solid #568878;padding:6px;border-radius:6px;font-size:11px}
+#nw-panel button:active{background:#518465}
+#nw-panel .nw-water{border-top:1px solid #5f897b;margin:9px 0;padding-top:9px}
+#nw-panel .nw-water b{font-size:11px;color:#b3dedc}
+#nw-panel #nw-hud{background:#173c3e;color:#ecdfaa;padding:8px;border-radius:6px;font-size:10px;line-height:1.6}
+#nw-panel #nw-note{font-size:11px;color:#d6deaf;padding-top:7px;line-height:1.55}
+#nw-overlay{position:absolute;pointer-events:none!important;z-index:12;mix-blend-mode:normal}
+@media(max-width:650px){#nw-panel{padding:7px;margin:6px 0}#nw-panel>summary{font-size:11px}#nw-panel label{font-size:10px}#nw-panel button{font-size:10px}}

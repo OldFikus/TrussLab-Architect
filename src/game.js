@@ -442,6 +442,7 @@ function mercatorUnproject(x,y){
 }
 function regionTileKey(x,y,tileSize){return `${Math.floor(x/tileSize)}:${Math.floor(y/tileSize)}`;}
 function validateRegionIndex(raw){
+ raw=unpackPlanetRegion(raw);
  if(raw?.type!=='TrussLabRegionIndex'||raw.version!==1||raw.projection!=='EPSG:3857')throw Error('Нужен TrussLabRegionIndex v1 (EPSG:3857)');
  const size=raw.tileSizeMeters;
  if(!Number.isInteger(size)||size<256||size>20000)throw Error('Недопустимый размер тайла');
@@ -483,6 +484,7 @@ class RegionTileStore{
  async openDirectory(fileList){
   const files=normalizeRegionFiles(fileList),manifest=files.get('index.json');
   if(!manifest)throw Error('В папке нет index.json; выбери папку, созданную build_region_tiles.py');
+  if(manifest.size>32*1024*1024)throw Error("Индекс превышает 32 МиБ");
   const raw=JSON.parse(await manifest.text());
   return this.setManifest(raw,{files,mode:'directory'});
  }
@@ -600,7 +602,9 @@ class RegionAtlas{
   document.getElementById('atlas-files')?.addEventListener('click',()=>document.getElementById('atlas-file-picker')?.click());
   document.getElementById('atlas-file-picker')?.addEventListener('change',async e=>{
    try{const files=[...(e.target.files||[])];if(!files.length)return;
-    const idx=await this.store.openDirectory(files);this.error='';this.schedule();
+    const idx=await this.store.openDirectory(files);this.error='';
+    const region=idx.metadata.region;if(region)this.goTo(region.center[1],region.center[0],.09);
+    this.schedule();
     this.statusMessage(`Папка подключена: ${idx.tiles.size} тайлов. Загружается только область на экране.`);
    }catch(err){this.error=err.message;this.statusMessage('Ошибка папки: '+err.message)}finally{e.target.value=''}
   });
@@ -731,7 +735,9 @@ class RegionAtlas{
   if(ax>-30&&ax<w+30&&ay>-30&&ay<h+30){ctx.fillStyle='#f5b55b';ctx.beginPath();ctx.arc(ax,ay,4.5,0,Math.PI*2);ctx.fill();ctx.font='12px system-ui';ctx.fillText('≈ Керчь / геореференс',ax+10,ay-12)}
   const stats=this.store.stats(),place=mercatorUnproject(this.center.x,this.center.y);
   const line=`${this.store.mode==='none'?'Нет регионального набора':this.store.mode} · ${stats.cached}/${stats.indexed} в кэше · на экране ${paintedTiles} тайлов, ${shapes} объектов · центр ${place.lat.toFixed(4)}°, ${place.lon.toFixed(4)}°`;
-  if(this.status)this.status.textContent=this.tooFar?'Слишком большой обзор для загрузки тайлов: увеличь масштаб. Крым показан только схематично.':this.error&&stats.mode==='none'?this.error:line+(stats.failures?' · ошибок загрузки: '+stats.failures:'');
+  const region=this.store.index?.metadata?.region;
+  const credit=region?region.name+' · '+region.source.quality+' · '+region.source.attribution+' · '+region.source.license+' | ':'';
+  if(this.status)this.status.textContent=credit+(this.tooFar?'Слишком большой обзор для загрузки тайлов: увеличь масштаб. Крым показан только схематично.':this.error&&stats.mode==='none'?this.error:line+(stats.failures?' · ошибок загрузки: '+stats.failures:''));
   const scaleEl=document.getElementById('atlas-scale');if(scaleEl)scaleEl.textContent=`${(120/this.scale/1000).toFixed(2)} км / 120 px (проекционная шкала)`;
  }
  setDemo(){
@@ -1386,6 +1392,10 @@ fn materialColor(id: f32, p: vec3<f32>) -> vec3<f32> {
   if(id < 8.5) {return vec3<f32>(0.43,0.46,0.47);}
   if(id < 9.5) {return vec3<f32>(0.62,0.56,0.48);}
   if(id < 10.5) {return vec3<f32>(0.09,0.17,0.25);}
+  if(id < 11.5) {return vec3<f32>(0.16,0.44,0.22);}
+  if(id < 12.5) {return vec3<f32>(0.69,0.35,0.11);}
+  if(id < 13.5) {return vec3<f32>(0.81,0.85,0.87);}
+  if(id < 14.5) {return vec3<f32>(0.36,0.49,0.23);}
   return vec3<f32>(0.26,0.34,0.20);
 }
 @fragment fn fragment_main(input: VertexOut) -> @location(0) vec4<f32> {
@@ -1566,7 +1576,7 @@ varying vec3 vNormal;varying float vMaterial;varying vec3 vWorld;
 void main(){vWorld=p+tileOffset;vNormal=n;vMaterial=material;gl_Position=viewProjection*vec4(vWorld,1.0);}`;
 const REGIONAL_FRAGMENT=`precision highp float;
 varying vec3 vNormal;varying float vMaterial;varying vec3 vWorld;
-uniform vec3 sunDir;uniform vec3 cameraOffset;uniform float night;uniform float sunset;uniform float seconds;uniform float fogDistance;uniform float exposure;uniform float materialStyle;
+uniform vec3 sunDir;uniform vec3 cameraOffset;uniform float night;uniform float sunset;uniform float seconds;uniform float fogDistance;uniform float exposure;uniform float materialStyle;uniform float natureSolar;
 vec3 materialColor(float mat,vec3 p){
  if(mat<.5){float r=sin(p.x*.05)*sin(p.z*.13);return mix(vec3(.27,.39,.23),vec3(.40,.49,.28),r*.5+.5);}
  if(mat<1.5)return vec3(.7,.64,.46);
@@ -1579,6 +1589,10 @@ vec3 materialColor(float mat,vec3 p){
  if(mat<8.5)return vec3(.43,.48,.49);
  if(mat<9.5)return vec3(.62,.56,.48);
  if(mat<10.5)return vec3(.10,.17,.23);
+ if(mat<11.5)return vec3(.16,.44,.22); // spring/summer foliage
+ if(mat<12.5)return vec3(.69,.35,.11); // autumn foliage
+ if(mat<13.5)return vec3(.81,.85,.87); // winter snow/grass
+ if(mat<14.5)return vec3(.36,.49,.23); // wetland reeds
  return vec3(.55,.62,.64);
 }
 void main(){
@@ -1592,14 +1606,14 @@ void main(){
  float a2=pow(rough,4.),den=ndh*ndh*(a2-1.)+1.,D=a2/(3.14159*den*den+.0001);
  float k=pow(rough+1.,2.)/8.,G=d/(d*(1.-k)+k+.0001)*ndv/(ndv*(1.-k)+k+.0001);
  vec3 F0=mix(vec3(.04),c,metal),F=F0+(1.-F0)*pow(1.-vdh,5.),kd=(1.-F)*(1.-metal);
- float sunStrength=night>.5?.16:sunset>.5?.62:.95;
- c=c*(night>.5?.14:sunset>.5?.30:.42)+(kd*c/3.14159+D*G*F/(4.*d*ndv+.003))*d*sunStrength;
+ float sunStrength=natureSolar>=-0.5?(.10+.85*smoothstep(-.12,.65,natureSolar)):(night>.5?.16:sunset>.5?.62:.95);
+ c=c*(natureSolar>=-0.5?mix(.13,.42,smoothstep(-.12,.65,natureSolar)):(night>.5?.14:sunset>.5?.30:.42))+(kd*c/3.14159+D*G*F/(4.*d*ndv+.003))*d*sunStrength;
  if(mat>2.5&&mat<3.5){float wave=sin(vWorld.x*.055+seconds*1.6)*sin(vWorld.z*.08-seconds*.55);c+=vec3(.04,.08,.1)*wave;}
  if(mat>4.5&&mat<5.5){float win=step(.28,fract(vWorld.x*.23))*step(.2,fract(vWorld.y*.30))*step(.25,fract(vWorld.z*.21));c+=vec3(.05,.07,.065)*win;}
  if(night>.5&&mat>4.5&&mat<5.5){float win=step(.66,fract(vWorld.x*.3))*step(.58,fract(vWorld.y*.30))*step(.4,fract(vWorld.z*.31));c+=vec3(.45,.36,.12)*win;}
  if(night>.5&&mat>9.5&&mat<10.5){float lit=step(.48,fract(vWorld.x*.19+vWorld.y*.33+vWorld.z*.12));c+=vec3(.45,.31,.12)*lit;}
  float dist=distance(vWorld,cameraOffset);float fog=clamp((dist-fogDistance*.45)/(fogDistance*.85),0.,1.);
- vec3 sky=night>.5?vec3(.045,.064,.105):sunset>.5?vec3(.68,.53,.42):vec3(.55,.72,.82);
+ vec3 sky=natureSolar>=-0.5?mix(vec3(.045,.064,.105),vec3(.55,.72,.82),smoothstep(-.12,.65,natureSolar)):(night>.5?vec3(.045,.064,.105):sunset>.5?vec3(.68,.53,.42):vec3(.55,.72,.82));
  vec3 rgb=mix(c,sky,fog*.77);
  float g=dot(rgb,vec3(.2126,.7152,.0722));
  if(materialStyle>1.5)rgb=mix(vec3(g),rgb,.82);
@@ -1626,9 +1640,9 @@ class Region3D{
   if(!gl){this.ctx=this.canvas.getContext('2d');this.software=true;this.statusMessage('WebGL недоступен — включён резервный 2.5D-просмотр. Для полноценного 3D нужен WebGL.');return;}
   try{
    const prog=gl.createProgram();gl.attachShader(prog,compileRShader(gl,gl.VERTEX_SHADER,REGIONAL_VERTEX));gl.attachShader(prog,compileRShader(gl,gl.FRAGMENT_SHADER,REGIONAL_FRAGMENT));gl.linkProgram(prog);
-   if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));
+   if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){const log=gl.getProgramInfoLog(prog)||'(пустой журнал)';const lost=gl.isContextLost();const code=gl.getError();throw Error('LINK_STATUS false; isContextLost='+lost+'; glError=0x'+code.toString(16)+'; info='+log);}
    this.gl=gl;this.prog=prog;this.ap=gl.getAttribLocation(prog,'p');this.an=gl.getAttribLocation(prog,'n');this.am=gl.getAttribLocation(prog,'material');
-   this.uvp=gl.getUniformLocation(prog,'viewProjection');this.uoffset=gl.getUniformLocation(prog,'tileOffset');this.usun=gl.getUniformLocation(prog,'sunDir');this.ucam=gl.getUniformLocation(prog,'cameraOffset');this.unight=gl.getUniformLocation(prog,'night');this.usunset=gl.getUniformLocation(prog,'sunset');this.utime=gl.getUniformLocation(prog,'seconds');this.ufog=gl.getUniformLocation(prog,'fogDistance');this.uexposure=gl.getUniformLocation(prog,'exposure');this.ustyle=gl.getUniformLocation(prog,'materialStyle');
+   this.uvp=gl.getUniformLocation(prog,'viewProjection');this.uoffset=gl.getUniformLocation(prog,'tileOffset');this.usun=gl.getUniformLocation(prog,'sunDir');this.ucam=gl.getUniformLocation(prog,'cameraOffset');this.unight=gl.getUniformLocation(prog,'night');this.usunset=gl.getUniformLocation(prog,'sunset');this.utime=gl.getUniformLocation(prog,'seconds');this.ufog=gl.getUniformLocation(prog,'fogDistance');this.uexposure=gl.getUniformLocation(prog,'exposure');this.ustyle=gl.getUniformLocation(prog,'materialStyle');this.unatureSolar=gl.getUniformLocation(prog,'natureSolar');
    gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);
   }catch(err){
    console.warn('Region3D GPU initialization failed',err);
@@ -1829,7 +1843,7 @@ class Region3D{
   const b=evictMeshBytes([this.terrainCache,this.cityCache,this.modelCache],{limitBytes:this._profile().cpuBudgetMB*1048576,keep,dispose:e=>{if(this.gl&&e.buffer)this.gl.deleteBuffer(e.buffer);this.webgpu?.release(e);}});
   this.stats.cpuMB=+(b.bytes/1048576).toFixed(1);
  }
- _render(){const c=this.canvas,w=c.clientWidth,h=c.clientHeight;if(w<2||h<2)return;
+ _render(){const nature=globalThis.TrussLabNature?.model,enabled=!!(nature&&globalThis.TrussLabWorldVisual?.region?.sandbox),solar=enabled?Math.sin((nature.hour-6)/12*Math.PI):-1,dayMix=enabled?Math.max(0,Math.min(1,(solar+.12)/.82)):1;const c=this.canvas,w=c.clientWidth,h=c.clientHeight;if(w<2||h<2)return;
   const dpr=Math.min(this._profile().dprCap,window.devicePixelRatio||1),W=Math.max(1,Math.round(w*dpr)),H=Math.max(1,Math.round(h*dpr));
   if(c.width!==W||c.height!==H){c.width=W;c.height=H}
   const allEntries=[...this.visibleTerrain,...(this.showCity?this.visibleCity:[]),...(this.showAssets?this.visibleModels:[])];
@@ -1840,8 +1854,8 @@ class Region3D{
    const eye=[(this.cam.x-this.origin.x),this.cam.y,(this.cam.z-this.origin.z)];
    const target=Radd(eye,this.forward());
    const vp=Rmatmul(webgpuProjection(Math.PI*.32,w/h,.25,7500),RlookAt(eye,target));
-   const sun=this.day==='night'?[-.2,.25,.3]:[.55,.85,.3];
-   const sky=this.day==='night'?[.035,.065,.105,1]:this.day==='sunset'?[.68,.51,.40,1]:[.48,.68,.81,1];
+   const sun=enabled?[.55,Math.max(.08,solar),.3]:this.day==='night'?[-.2,.25,.3]:[.55,.85,.3];
+   const sky=enabled?[.035+.445*dayMix,.065+.615*dayMix,.105+.705*dayMix,1]:this.day==='night'?[.035,.065,.105,1]:this.day==='sunset'?[.68,.51,.40,1]:[.48,.68,.81,1];
    try{
     this.webgpu.render(filtered.visible,{width:W,height:H,vp,origin:this.origin,camera:eye,sun,night:this.day==='night'?1:0,sunset:this.day==='sunset'?1:0,time:performance.now()*.001,fog:this._profile().fog,groundScale:1,exposure:this.materialStyle===1?1.10:this.materialStyle===2?.90:1,style:this.materialStyle,sky});
     this.stats.drawCalls=this.webgpu.drawCalls;return;
@@ -1849,12 +1863,12 @@ class Region3D{
   }
   if(!this.gl){this._renderFallback(w,h);return;}
   const gl=this.gl;gl.viewport(0,0,W,H);
-  const colors=this.day==='night'?[.035,.065,.105,1]:this.day==='sunset'?[.68,.51,.40,1]:[.48,.68,.81,1];gl.clearColor(...colors);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const colors=enabled?[.035+.445*dayMix,.065+.615*dayMix,.105+.705*dayMix,1]:this.day==='night'?[.035,.065,.105,1]:this.day==='sunset'?[.68,.51,.40,1]:[.48,.68,.81,1];gl.clearColor(...colors);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   gl.useProgram(this.prog);
   const eye=[(this.cam.x-this.origin.x),this.cam.y,(this.cam.z-this.origin.z)],target=Radd(eye,this.forward());
   const vp=Rmatmul(Rperspective(Math.PI*.32,w/h,.25,7500),RlookAt(eye,target));
   gl.uniformMatrix4fv(this.uvp,false,new Float32Array(vp));
-  gl.uniform3f(this.ucam,...eye);gl.uniform3f(this.usun,this.day==='night'?-.2:.55,this.day==='night'?.25:.85,.3);
+  gl.uniform3f(this.ucam,...eye);gl.uniform3f(this.usun,enabled?.55:this.day==='night'?-.2:.55,enabled?Math.max(.08,solar):this.day==='night'?.25:.85,.3);gl.uniform1f(this.unatureSolar,solar);
   gl.uniform1f(this.unight,this.day==='night'?1:0);gl.uniform1f(this.usunset,this.day==='sunset'?1:0);gl.uniform1f(this.utime,performance.now()*.001);
   gl.uniform1f(this.ufog,this._profile().fog);gl.uniform1f(this.uexposure,this.materialStyle===1?1.10:this.materialStyle===2?.90:1);gl.uniform1f(this.ustyle,this.materialStyle);
   for(const [loc,size,offset] of [[this.ap,3,0],[this.an,3,12],[this.am,1,24]])gl.enableVertexAttribArray(loc);
@@ -2549,7 +2563,7 @@ void main(){
 const POST_VS=`attribute vec2 p;varying vec2 uv;void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
 const POST_FS=`precision highp float;varying vec2 uv;
 uniform sampler2D sceneColor;uniform sampler2D previousColor;uniform sampler2D sceneDepth;
-uniform mat4 currentInvVP;uniform mat4 previousVP;uniform float depthAvailable;uniform vec2 px;uniform float temporalWeight;uniform float sharpen;uniform float edgeOn;
+uniform mat4 currentInvVP;uniform mat4 previousVP;uniform float depthAvailable;uniform vec2 px;uniform float temporalWeight;uniform float sharpen;uniform float edgeOn;uniform float fxaaStrength;
 float lum(vec3 v){return dot(v,vec3(.299,.587,.114));}
 vec3 fxaa(vec2 p){
  vec3 c=texture2D(sceneColor,p).rgb;
@@ -2570,9 +2584,9 @@ vec3 fxaa(vec2 p){
  float L=lum(farMix);return L<low||L>high?avg:farMix;
 }
 void main(){
- vec3 curr=fxaa(uv),l=texture2D(sceneColor,uv-px).rgb,r=texture2D(sceneColor,uv+px).rgb;
+ vec3 raw=texture2D(sceneColor,uv).rgb;vec3 curr=mix(raw,fxaa(uv),fxaaStrength),l=texture2D(sceneColor,uv-px).rgb,r=texture2D(sceneColor,uv+px).rgb;
  vec3 u=texture2D(sceneColor,uv+px*vec2(0.,1.)).rgb,d=texture2D(sceneColor,uv-px*vec2(0.,1.)).rgb;
- vec3 lo=min(curr,min(min(l,r),min(u,d))),hi=max(curr,max(max(l,r),max(u,d)));
+ vec3 lo=min(curr,min(min(l,r),min(u,d))),hi=max(curr,max(max(l,r),max(u,d)));vec3 diag1=texture2D(sceneColor,uv+px*vec2(-1.,1.)).rgb,diag2=texture2D(sceneColor,uv+px*vec2(1.,-1.)).rgb;lo=min(lo,min(diag1,diag2));hi=max(hi,max(diag1,diag2));
  vec2 previousUV=uv;float reprojectionValid=1.;
  if(depthAvailable>.5){
   float depth=texture2D(sceneDepth,uv).r;
@@ -2584,19 +2598,24 @@ void main(){
   }
  }
  vec3 history=clamp(texture2D(previousColor,clamp(previousUV,vec2(.001),vec2(.999))).rgb,lo-.025,hi+.025);
- float reject=clamp(1.-length(history-curr)*2.8,0.,1.)*reprojectionValid;
+ float contrast=length(hi-lo);float reject=clamp(1.-length(history-curr)*2.8,0.,1.)*reprojectionValid*(1.-.35*smoothstep(.18,.75,contrast));
  vec3 color=mix(curr,history,temporalWeight*reject);
  vec3 cross=.25*(l+r+u+d);color=clamp(color+(color-cross)*sharpen,0.,1.);
  gl_FragColor=vec4(color,1.);
 }`;
-const COPY_FS=`precision highp float;varying vec2 uv;uniform sampler2D currentFrame;void main(){gl_FragColor=texture2D(currentFrame,uv);}`;
+const COPY_FS=`precision highp float;varying vec2 uv;uniform sampler2D currentFrame;uniform vec2 texel;uniform float sharp;
+void main(){vec3 c=texture2D(currentFrame,uv).rgb;if(sharp>.001){
+vec3 s=texture2D(currentFrame,uv+vec2(texel.x,0.)).rgb+texture2D(currentFrame,uv-vec2(texel.x,0.)).rgb;
+s+=texture2D(currentFrame,uv+vec2(0.,texel.y)).rgb+texture2D(currentFrame,uv-vec2(0.,texel.y)).rgb;
+c=clamp(c+sharp*(c-s*.25),0.,1.);}
+gl_FragColor=vec4(c,1.);}`;
 function shaderForContext(gl,type,code){
  if(typeof WebGL2RenderingContext==='undefined'||!(gl instanceof WebGL2RenderingContext))return code;
  const vertex=type===gl.VERTEX_SHADER;
  const prefix='#version 300 es\n'+(vertex?'#define USE_VERTEX_300 1\n':'#define USE_MATERIAL_ARRAY 1\n#define texture2D texture\nprecision highp float;\nout vec4 fragOut;\n');
  return prefix+code.replace(/\battribute\b/g,vertex?'in':'attribute').replace(/\bvarying\b/g,vertex?'out':'in').replace(/\bgl_FragColor\b/g,'fragOut');
 }
-function makeShader(gl,t,src){src=shaderForContext(gl,t,src);let s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s}
+function makeShader(gl,t,src){src=shaderForContext(gl,t,src);let s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){const log=gl.getShaderInfoLog(s)||'(пустой журнал)';throw Error('COMPILE_STATUS false; isContextLost='+gl.isContextLost()+'; glError=0x'+gl.getError().toString(16)+'; info='+log);}return s}
 class Mesh{
  constructor(){this.a=[]}
  triangle(a,b,c,m){let n=norm(cross(sub(b,a),sub(c,a)));for(let p of [a,b,c])this.a.push(...p,...n,m)}
@@ -2616,31 +2635,274 @@ class Mesh{
  clear(){this.a.length=0}
 }
 function clampTerrain(v){return wClamp(v,-3,7)}
+/* WebGL startup v2: avoid allocating/losing two throw-away contexts before
+ * the real world canvas.  Probe and USE the visible canvas directly.
+ * More conservative attribute variants can work with hybrid-GPU ANGLE setups.
+ * Record webglcontextcreationerror.statusMessage for real diagnostics. */
+const TRUSS_GPU_OPTS={alpha:false,antialias:true,depth:true,powerPreference:'high-performance',preserveDrawingBuffer:false};
+const TRUSS_GPU_PROFILES=[
+ {label:'performance',opts:TRUSS_GPU_OPTS},
+ {label:'standard',opts:{alpha:false,depth:true,antialias:true,preserveDrawingBuffer:false}},
+ {label:'default',opts:undefined}
+];
+function trussTryCanvasAPI(canvas,api,attempts){
+ const creationErrors=[];
+ const onError=e=>{if(e.statusMessage)creationErrors.push(String(e.statusMessage));};
+ canvas.addEventListener('webglcontextcreationerror',onError);
+ try{
+  for(const variant of TRUSS_GPU_PROFILES){
+   let gl=null;
+   try{gl=variant.opts?canvas.getContext(api,variant.opts):canvas.getContext(api)}
+   catch(err){attempts.push(api+' ['+variant.label+'] threw '+String(err?.message||err).slice(0,350));continue;}
+   if(gl){attempts.push(api+' ['+variant.label+'] context created');return gl;}
+   attempts.push(api+' ['+variant.label+'] no context'+(creationErrors.length?' ('+creationErrors.at(-1).slice(0,420)+')':''));
+  }
+ }finally{canvas.removeEventListener('webglcontextcreationerror',onError);}
+ return null;
+}
+function trussSelectBackend(canvas){
+ const forceGL1=new URLSearchParams(location.search).get('trussGL')==='webgl1';
+ const order=forceGL1?['webgl','webgl2']:['webgl2','webgl'];
+ const attempts=[];let current=canvas;
+ for(const api of order){
+  const gl=trussTryCanvasAPI(current,api,attempts);
+  if(gl)return {api,gl,canvas:current,attempts};
+  // A previously attempted canvas may be locked to 2D by a third-party
+  // script, or a failed ANGLE context can mark it unusable. Recreate it.
+  const replacement=current.cloneNode(false);current.replaceWith(replacement);current=replacement;
+ }
+ // Legacy WebGL alias may work on older implementations.
+ const legacy=trussTryCanvasAPI(current,'experimental-webgl',attempts);
+ if(legacy)return {api:'webgl',gl:legacy,canvas:current,attempts};
+ return {api:null,gl:null,canvas:current,attempts};
+}
+/* Independent, intentionally conservative GPU fallback. No shadow samplers,
+ * float textures, sampler2D arrays, dynamic sampler indexing or extensions.
+ * It is still WebGL — bridge, city geometry and camera remain on the GPU. */
+const TRUSS_SAFE_VS=`attribute vec3 p; attribute vec3 n; attribute float m;
+uniform mat4 vp; uniform float time;
+varying vec3 vN; varying float vM; varying float vFog;
+void main(){vec3 x=p;
+ if(m>5.5 && m<6.5)x.y+=.025*sin(x.x*.48+time*.7);
+ vec4 clip=vp*vec4(x,1.);gl_Position=clip;
+ vN=n;vM=m;vFog=abs(clip.w);}`;
+const TRUSS_SAFE_FS=`precision mediump float;
+varying vec3 vN; varying float vM; varying float vFog;
+uniform float dark;uniform float exposure;uniform float farScale;
+vec3 colorFor(float x){
+ if(x<.5)return vec3(.20,.33,.22);if(x<1.5)return vec3(.68,.58,.41);
+ if(x<2.5)return vec3(.43,.32,.24);if(x<3.5)return vec3(.24,.27,.29);
+ if(x<4.5)return vec3(.62,.67,.67);if(x<5.5)return vec3(.39,.46,.51);
+ if(x<6.5)return vec3(.12,.39,.59);if(x<7.5)return vec3(.23,.42,.52);
+ if(x<8.5)return vec3(.41,.45,.49);if(x<9.5)return vec3(.55,.49,.40);
+ if(x<10.5)return vec3(.80,.78,.70);if(x<11.5)return vec3(.18,.39,.24);
+ if(x<12.5)return vec3(.66,.41,.19);if(x<13.5)return vec3(.78,.84,.88);
+ return vec3(.41,.49,.44);
+}
+void main(){vec3 n=normalize(vN),sun=normalize(vec3(.45,.84,.34));
+ float light=.40+.60*max(0.,dot(n,sun));vec3 col=colorFor(floor(vM+.5))*light;
+ if(dark>.5)col*=.48;col*=clamp(exposure,.5,2.);
+ float fog=clamp((vFog-80.)/max(70.,farScale*2.),0.,.82);
+ col=mix(col,vec3(.49,.67,.77),fog);
+ gl_FragColor=vec4(col,1.);}`;
+/* Compact, opt-in quality shader: no cascade-shadow samplers, no dynamic
+ * light loops, no texture arrays, no GPU extensions. It intentionally stays
+ * below the former 13.6-kB fragment stage that loses context on some ANGLE
+ * drivers. It is NOT the historical heavy program. */
+const TRUSS_BALANCED_VS=`attribute vec3 p;attribute vec3 n;attribute float m;
+uniform mat4 vp;uniform float time;
+varying vec3 vP;varying vec3 vN;varying float vM;varying float vFog;
+void main(){vec3 x=p;
+ if(m>5.5&&m<6.5)x.y+=.035*sin(x.x*.43+time*.79)+.02*sin(x.z*.67-time*.5);
+ vec4 clip=vp*vec4(x,1.);gl_Position=clip;
+ vP=x;vN=n;vM=m;vFog=abs(clip.w);}`;
+const TRUSS_BALANCED_FS=`precision highp float;
+varying vec3 vP;varying vec3 vN;varying float vM;varying float vFog;
+uniform float dark;uniform float exposure;uniform float farScale;
+uniform float time;uniform float weather;uniform vec3 cameraPos;
+uniform vec3 sunDirection;uniform vec3 sunColor;
+uniform mat4 lightVP;uniform sampler2D shadowMap;uniform float shadowEnabled;
+uniform vec2 shadowTexel;uniform float shadowSoftness;uniform mat4 reflectVP;uniform sampler2D waterReflection;uniform vec2 reflectionTexel;uniform float reflectionFine;
+uniform float reflectionEnabled;uniform float reflectionPass;
+float depthOf(vec4 c){return dot(c,vec4(1./16777216.,1./65536.,1./256.,1.));}
+float softSunShadow(vec3 position,float ndl){
+ if(shadowEnabled<.5)return 1.;
+ vec4 clip=lightVP*vec4(position,1.);
+ if(clip.w<=0.)return 1.;
+ vec3 sc=clip.xyz/clip.w*.5+.5;
+ if(sc.x<=.003||sc.y<=.003||sc.x>=.997||sc.y>=.997||sc.z>=1.||sc.z<0.)return 1.;
+ float bias=mix(.0025,.0007,clamp(ndl,0.,1.));
+ float v=0.;
+ if(shadowSoftness>.5){
+  for(int a=-1;a<=1;a++)for(int b=-1;b<=1;b++){
+   vec2 uv=sc.xy+vec2(float(a),float(b))*shadowTexel;
+   v+=step(sc.z-bias,depthOf(texture2D(shadowMap,uv)));
+  }
+  return v/9.;
+ }
+ for(int a=0;a<2;a++)for(int b=0;b<2;b++){
+  vec2 uv=sc.xy+(vec2(float(a),float(b))-.5)*shadowTexel;
+  v+=step(sc.z-bias,depthOf(texture2D(shadowMap,uv)));
+ }
+ return v*.25;
+}
+float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.54);}
+vec3 pal(float m){
+ if(m<.5)return vec3(.23,.34,.20);if(m<1.5)return vec3(.70,.60,.43);
+ if(m<2.5)return vec3(.40,.30,.22);if(m<3.5)return vec3(.25,.28,.30);
+ if(m<4.5)return vec3(.61,.66,.65);if(m<5.5)return vec3(.39,.47,.52);
+ if(m<6.5)return vec3(.09,.28,.42);if(m<7.5)return vec3(.25,.40,.48);
+ if(m<8.5)return vec3(.44,.46,.49);if(m<9.5)return vec3(.52,.48,.41);
+ if(m<10.5)return vec3(.79,.80,.72);if(m<11.5)return vec3(.22,.41,.26);
+ if(m<12.5)return vec3(.65,.42,.20);if(m<13.5)return vec3(.80,.84,.88);
+ if(m<14.5)return vec3(.35,.50,.28);if(m<15.5)return vec3(.27,.38,.27);
+ if(m<16.5)return vec3(.91,.83,.59);if(m<17.5)return vec3(.13,.19,.20);
+ if(m<18.5)return vec3(.91,.92,.89);if(m<19.5)return vec3(.58,.31,.26);
+ if(m<20.5)return vec3(.72,.74,.71);if(m<21.5)return vec3(.70,.78,.78);
+ if(m<22.5)return vec3(.65,.40,.24);if(m<23.5)return vec3(.96,.84,.49);
+ if(m<24.5)return vec3(.85,.89,.92);if(m<25.5)return vec3(.55,.76,.57);
+ if(m<26.5)return vec3(.16,.27,.33);if(m<27.5)return vec3(.10,.16,.21);
+ return vec3(.52,.59,.63);
+}
+void main(){
+ float m=floor(vM+.5);
+ if(reflectionPass>.5&&m>5.5&&m<6.5)discard;
+ vec3 N=normalize(vN),sun=normalize(sunDirection),V=normalize(cameraPos-vP);
+ vec3 c=pal(m);
+ float grit=hash(floor(vP.xz*2.0));
+ if(m<3.5&&m<.5)c*=.86+.22*grit;
+ if(m>2.5&&m<5.5)c*=.92+.15*grit;
+ float lam=max(0.,dot(N,sun));
+ vec3 ambient=vec3(.36,.39,.42);
+ if(m>5.5&&m<6.5){
+  float waveFade=1.-smoothstep(75.,300.,vFog);
+  float a=sin(vP.x*.8+time*.81),b=sin(vP.z*1.05-time*.52);
+  N=normalize(vec3(-.07*waveFade*cos(vP.x*.8+time*.81),1.,-.07*waveFade*cos(vP.z*1.05-time*.52)));
+  float fres=pow(1.-max(0.,dot(N,V)),4.);
+  c=mix(vec3(.045,.24,.31),vec3(.45,.64,.73),.12+.48*fres+.08*waveFade*(a+b));
+  float shine=pow(max(0.,dot(reflect(-sun,N),V)),48.);
+  c+=vec3(.48,.49,.43)*shine*(.2+.42*waveFade);
+  lam=max(0.,dot(N,sun));
+ }
+ float shadow=softSunShadow(vP,lam);
+ float light=.42+.60*lam*mix(.32,1.,shadow);
+ c*=light;
+ if(m>5.5&&m<6.5&&reflectionEnabled>.5&&reflectionPass<.5){
+   vec4 rp=reflectVP*vec4(vP,1.);
+   vec2 q=rp.xy/max(rp.w,.001)*.5+.5;
+   float margin=min(min(q.x,1.-q.x),min(q.y,1.-q.y));
+   float visible=smoothstep(.012,.055,margin)*step(.001,rp.w);
+   float fres=pow(1.-clamp(dot(N,V),0.,1.),4.);
+   // Controlled optical blur of distant reflections; stable world-space sampling.
+   vec2 uv=clamp(q,vec2(.005),vec2(.995));
+   vec3 mirror=texture2D(waterReflection,uv).rgb;
+   if(reflectionFine>.5){
+    vec2 t=reflectionTexel*1.1;
+    vec3 halo=texture2D(waterReflection,clamp(uv+t,vec2(.005),vec2(.995))).rgb;
+    halo+=texture2D(waterReflection,clamp(uv-t,vec2(.005),vec2(.995))).rgb;
+    halo+=texture2D(waterReflection,clamp(uv+vec2(t.x,-t.y),vec2(.005),vec2(.995))).rgb;
+    halo+=texture2D(waterReflection,clamp(uv+vec2(-t.x,t.y),vec2(.005),vec2(.995))).rgb;
+    mirror=mix(mirror,halo*.25,.35);
+   }
+   c=mix(c,mirror,(.17+.55*fres)*visible);
+ }
+ if(m>4.5&&m<5.5){vec3 R=reflect(-sun,N);c+=sunColor*.18*pow(max(dot(R,V),0.),24.);}
+ if(m>26.5&&m<27.5)c=mix(c,vec3(.97,.70,.36),dark>.5?.72:.03);
+ if(dark>.5)c*=.49;
+ if(weather>1.5)c*=.68;
+ float fog=clamp((vFog/max(farScale,1.)-.26)*.69,0.,.75);
+ vec3 sky=dark>.5?vec3(.08,.13,.22):vec3(.50,.69,.80);
+ c=mix(c,sky,fog);
+ c=max(c*clamp(exposure,.3,3.),vec3(0.));
+ gl_FragColor=vec4(c,1.);
+}`;
+function trussClarityCanvasLayout(canvas,preset){
+ const fixed=preset==='1080p'||preset==='1440p';
+ const parent=canvas.closest('.canvas-wrap');if(!parent)return;
+ if(!fixed){if(canvas.dataset.trussClarityLayout==='yes'){
+  for(const key of ['width','height','left','top','right','bottom','transform','objectFit'])canvas.style[key]='';
+  delete canvas.dataset.trussClarityLayout;
+ }return;}
+ const pw=parent.clientWidth,ph=parent.clientHeight;if(pw<2||ph<2)return;
+ const width=Math.max(1,Math.min(pw,ph*16/9)),height=width*9/16;
+ canvas.style.width=width+'px';canvas.style.height=height+'px';
+ canvas.style.left='50%';canvas.style.top='50%';canvas.style.right='auto';canvas.style.bottom='auto';
+ canvas.style.transform='translate(-50%,-50%)';canvas.style.objectFit='fill';
+ canvas.dataset.trussClarityLayout='yes';
+}
 class World3D{
- constructor(canvas){this.canvas=canvas;this.gl=null;try{this.gl=canvas.getContext('webgl2',{alpha:false,antialias:true,preserveDrawingBuffer:true})||canvas.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true})}catch(err){console.warn('TrussLab: browser denied WebGL, using CPU renderer.',err)}this.software=!this.gl;this.renderCoreCaps=RenderCoreCapabilities.detectGL(this.gl);this.ready=true;this.ctx=this.software?canvas.getContext('2d'):null;this.yaw=-2.18;this.pitch=-.18;this.zoom=1;this.moveSpeed=1.2;this.keys={};this.quality='ultra';this.resolutionScale=1;this.framePolicy='ultra';this.perfGovernor={last:0,low:0,high:0,changes:0,target:30};this.cameraBookmark=null;this.stats={frames:0,fps:0,triangles:0,meshMs:0,lastMeasure:0};this.coastDirty=true;this.coastTex=null;this.daylight='day';this.sunHour=13.0;this.lampsEnabled=true;this.headlightsEnabled=true;this.waterMode='cinematic';this.exposure=1.12;this.ambientLift=0;this.shadowOpacity=.31;this.lightPreset='balanced';this.shadowsEnabled=true;this.shadowDirty=true;this.shadowSize=0;this.shadowMap=null;this.shadowFbo=null;this.shadowDepth=null;this.lastShadowDraw=-1;this.cascades=[];this.cascadeSplits=[58,85,170];this.shadowCascadeUpdates=0;this.reflectionPasses=0;this.reflectionQuality='high';this.reflection=null;this.pbrAtlas=null;this.postQuality='fxaa';this.post=null;this.postFrame=0;this.postResets=0;this.taaHistoryStrength=.84;this.gpuStats={gpuMs:null,disjoint:false,queries:0};this.gpuBudgetMB=512;this.gpuBudgetWarn=false;this.sceneDirty=true;this.bufferDirty=true;this.mapEdit=new Float32Array(65*65);this.currentKey='';this.editBridge=false;this.selectedBridgeNode=null;this.mesh=new Mesh();this.trafficMesh=new Mesh();this.settlement=new SettlementStore();this.buildingMesh=new Mesh();this.cityData=null;this.cityEnabled=true;this.cityCache=new Map();this.cityVisible=[];this.cityTilesBuilt=0;this.cityTilesUploaded=0;this.buildingCount=0;this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.placeMode=false;this.settlementSelectedId=null;this.trafficCount=0;this.trafficEnabled=!this.software;this.trafficDirty=true;this.trafficBufferDirty=true;this.trafficUpdates=0;this.trafficRate='auto';this.staticBuilds=0;this.terrain=new Float32Array(65*65);this.paintLayer=new Uint8Array(65*65);this.brush='orbit';this.radius=4;this.theme='dark';this.time=0;this.lastState=null;this.message='';this.worldSize=72;this.map=false;this.sceneId='';this.routeOffsets=new Array(13).fill(0);this.routeExtents={x0:-118,x1:118};this.approachProfileCache=new Map();this.geoRoute=null;this.geoRouteSource=null;this.chunkSpan=35;this.chunkCache=new Map();this.visibleChunks=[];this.chunksBuilt=0;this.chunksVisible=0;this.chunkedTerrain=!this.software;this.gisMask=null;this.gisLandFeatures=0;this.gisBounds=null;this.coastMode='reference';this.geoPack=null;this.geoPackSource=null;this.demEnabled=false;this.demMetresPerUnit=8;this.roadRamp=22;this.railRamp=58;this.archDeckLevel=7.35;this.deckBaseLevel=4.3;this.drag=null;this.camPos=[0,18,72];this.animationTime=0;this.animBucket=-1;this.cameraMode='manual';this.eye=this.camPos.slice();this.focal=[0,2,0];this.initTerrain('sand');if(this.software){this.patterns=this.makePatterns();this.bindEvents();return;}try{let gl=this.gl;let prog=gl.createProgram();gl.attachShader(prog,makeShader(gl,gl.VERTEX_SHADER,VS));gl.attachShader(prog,makeShader(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));this.prog=prog;this.ap=gl.getAttribLocation(prog,'p');this.an=gl.getAttribLocation(prog,'n');this.am=gl.getAttribLocation(prog,'m');this.uvp=gl.getUniformLocation(prog,'vp');this.ut=gl.getUniformLocation(prog,'time');this.ud=gl.getUniformLocation(prog,'dark');this.uf=gl.getUniformLocation(prog,'farScale');this.uw=gl.getUniformLocation(prog,'weather');this.uc=gl.getUniformLocation(prog,'cameraPos');this.uWorldSize=gl.getUniformLocation(prog,'worldSize');this.uCoastEnabled=gl.getUniformLocation(prog,'coastEnabled');this.uCoast=gl.getUniformLocation(prog,'coastMap');this.uExposure=gl.getUniformLocation(prog,'exposure');this.uSunDir=gl.getUniformLocation(prog,'sunDirection');this.uSunColor=gl.getUniformLocation(prog,'sunColor');this.uAmbientColor=gl.getUniformLocation(prog,'ambientColor');this.uLampPositions=gl.getUniformLocation(prog,'lampPositions[0]');this.uLampCount=gl.getUniformLocation(prog,'lampCount');this.uHeadlamps=gl.getUniformLocation(prog,'headlamp[0]');this.uHeadCount=gl.getUniformLocation(prog,'headlampCount');this.uWaterDetail=gl.getUniformLocation(prog,'waterDetail');this.uLightVP=gl.getUniformLocation(prog,'lightVP');this.uShadowMap=gl.getUniformLocation(prog,'shadowMap');this.uShadowOn=gl.getUniformLocation(prog,'shadowEnabled');this.uAmbientLift=gl.getUniformLocation(prog,'ambientLift');this.uShadowOpacity=gl.getUniformLocation(prog,'shadowOpacity');this.uShadowTexel=gl.getUniformLocation(prog,'shadowTexel');
+ constructor(canvas){this.canvas=canvas;this.gpuBackend=trussSelectBackend(canvas);this.canvas=this.gpuBackend.canvas;this.gl=this.gpuBackend.gl;this.gpuFailures=this.gpuBackend.attempts.filter(x=>!x.includes('context created'));this.software=!this.gl;this.renderCoreCaps=RenderCoreCapabilities.detectGL(this.gl);this.ready=true;this.ctx=this.software?this.canvas.getContext('2d'):null;this.yaw=-2.18;this.pitch=-.18;this.zoom=1;this.moveSpeed=1.2;this.keys={};this.quality='ultra';this.resolutionScale=1;this.framePolicy='ultra';this.perfGovernor={last:0,low:0,high:0,changes:0,target:30};this.cameraBookmark=null;this.stats={frames:0,fps:0,triangles:0,meshMs:0,lastMeasure:0};this.coastDirty=true;this.coastTex=null;this.daylight='day';this.sunHour=13.0;this.lampsEnabled=true;this.headlightsEnabled=true;this.waterMode='cinematic';this.exposure=1.12;this.ambientLift=0;this.shadowOpacity=.31;this.lightPreset='balanced';this.shadowsEnabled=true;this.shadowDirty=true;this.shadowSize=0;this.shadowMap=null;this.shadowFbo=null;this.shadowDepth=null;this.lastShadowDraw=-1;this.cascades=[];this.cascadeSplits=[58,85,170];this.shadowCascadeUpdates=0;this.reflectionPasses=0;this.reflectionQuality='high';this.reflection=null;this.pbrAtlas=null;this.postQuality='off';this.aaMode='native';this.msaaSamples=0;this.qualitySsaa=1;this.qualitySharpness=.16;this.clarityPreset='auto';this.clarityFxaaStrength=.25;this.clarityLimited=false;this.clarityRequested=null;this.clarityActual=null;this.qualitySoftShadows=false;this.qualityFramePixels=0;this.qualityShadowDetail='standard';this.qualityReflectionDetail='standard';this.qualityTemporalFrameResets=0;this.qualityEffects={shadows:false,reflections:false};this.post=null;this.postFrame=0;this.postResets=0;this.taaHistoryStrength=.84;this.gpuStats={gpuMs:null,disjoint:false,queries:0};this.gpuBudgetMB=512;this.gpuBudgetWarn=false;this.sceneDirty=true;this.bufferDirty=true;this.mapEdit=new Float32Array(65*65);this.currentKey='';this.editBridge=false;this.selectedBridgeNode=null;this.mesh=new Mesh();this.trafficMesh=new Mesh();this.settlement=new SettlementStore();this.buildingMesh=new Mesh();this.cityData=null;this.cityEnabled=true;this.cityCache=new Map();this.cityVisible=[];this.cityTilesBuilt=0;this.cityTilesUploaded=0;this.buildingCount=0;this.buildingMeshDirty=true;this.buildingBufferDirty=true;this.placeMode=false;this.settlementSelectedId=null;this.trafficCount=0;this.trafficEnabled=!this.software;this.trafficDirty=true;this.trafficBufferDirty=true;this.trafficUpdates=0;this.trafficRate='auto';this.staticBuilds=0;this.terrain=new Float32Array(65*65);this.paintLayer=new Uint8Array(65*65);this.brush='orbit';this.radius=4;this.theme='dark';this.time=0;this.lastState=null;this.message='';this.worldSize=72;this.map=false;this.sceneId='';this.routeOffsets=new Array(13).fill(0);this.routeExtents={x0:-118,x1:118};this.approachProfileCache=new Map();this.geoRoute=null;this.geoRouteSource=null;this.chunkSpan=35;this.chunkCache=new Map();this.visibleChunks=[];this.chunksBuilt=0;this.chunksVisible=0;this.chunkedTerrain=!this.software;this.gisMask=null;this.gisLandFeatures=0;this.gisBounds=null;this.coastMode='reference';this.geoPack=null;this.geoPackSource=null;this.demEnabled=false;this.demMetresPerUnit=8;this.roadRamp=22;this.railRamp=58;this.archDeckLevel=7.35;this.deckBaseLevel=4.3;this.drag=null;this.camPos=[0,18,72];this.animationTime=0;this.animBucket=-1;this.cameraMode='manual';this.eye=this.camPos.slice();this.focal=[0,2,0];this.initTerrain('sand');if(this.software){this.patterns=this.makePatterns();this.bindEvents();this.message='WebGL шейдеры недоступны: '+this.gpuFailures.join(' / ').slice(0,450);return;}const initializeGPU=(mode='safe')=>{const safe=mode!=='full',balanced=mode==='balanced';let gl=this.gl;let prog=gl.createProgram();gl.attachShader(prog,makeShader(gl,gl.VERTEX_SHADER,balanced?TRUSS_BALANCED_VS:safe?TRUSS_SAFE_VS:VS));gl.attachShader(prog,makeShader(gl,gl.FRAGMENT_SHADER,balanced?TRUSS_BALANCED_FS:safe?TRUSS_SAFE_FS:FS));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));this.prog=prog;this.ap=gl.getAttribLocation(prog,'p');this.an=gl.getAttribLocation(prog,'n');this.am=gl.getAttribLocation(prog,'m');this.uvp=gl.getUniformLocation(prog,'vp');this.ut=gl.getUniformLocation(prog,'time');this.ud=gl.getUniformLocation(prog,'dark');this.uf=gl.getUniformLocation(prog,'farScale');this.uw=gl.getUniformLocation(prog,'weather');this.uc=gl.getUniformLocation(prog,'cameraPos');this.uWorldSize=gl.getUniformLocation(prog,'worldSize');this.uCoastEnabled=gl.getUniformLocation(prog,'coastEnabled');this.uCoast=gl.getUniformLocation(prog,'coastMap');this.uExposure=gl.getUniformLocation(prog,'exposure');this.uSunDir=gl.getUniformLocation(prog,'sunDirection');this.uSunColor=gl.getUniformLocation(prog,'sunColor');this.uAmbientColor=gl.getUniformLocation(prog,'ambientColor');this.uLampPositions=gl.getUniformLocation(prog,'lampPositions[0]');this.uLampCount=gl.getUniformLocation(prog,'lampCount');this.uHeadlamps=gl.getUniformLocation(prog,'headlamp[0]');this.uHeadCount=gl.getUniformLocation(prog,'headlampCount');this.uWaterDetail=gl.getUniformLocation(prog,'waterDetail');this.uLightVP=gl.getUniformLocation(prog,'lightVP');this.uShadowMap=gl.getUniformLocation(prog,'shadowMap');this.uShadowOn=gl.getUniformLocation(prog,'shadowEnabled');this.uAmbientLift=gl.getUniformLocation(prog,'ambientLift');this.uShadowOpacity=gl.getUniformLocation(prog,'shadowOpacity');this.uShadowTexel=gl.getUniformLocation(prog,'shadowTexel');this.uShadowSoftness=gl.getUniformLocation(prog,'shadowSoftness');this.uReflectionTexel=gl.getUniformLocation(prog,'reflectionTexel');this.uReflectionFine=gl.getUniformLocation(prog,'reflectionFine');
 this.uLightVPNear=gl.getUniformLocation(prog,'lightVPNear');this.uLightVPMid=gl.getUniformLocation(prog,'lightVPMid');this.uShadowNear=gl.getUniformLocation(prog,'shadowMapNear');this.uShadowMid=gl.getUniformLocation(prog,'shadowMapMid');this.uCascadeSplits=gl.getUniformLocation(prog,'cascadeSplits');
 this.uReflectionVP=gl.getUniformLocation(prog,'reflectVP');this.uReflectionTexture=gl.getUniformLocation(prog,'waterReflection');this.uReflectionEnabled=gl.getUniformLocation(prog,'reflectionEnabled');this.uReflectionPass=gl.getUniformLocation(prog,'reflectionPass');
-this.uPBRAtlas=gl.getUniformLocation(prog,'materialAtlas');this.uPBREnabled=gl.getUniformLocation(prog,'materialAtlasEnabled');this.uPBRArray=gl.getUniformLocation(prog,'materialArrayReady');this.uMaterialArray=gl.getUniformLocation(prog,'materialArray');this.uTurbidity=gl.getUniformLocation(prog,'atmosphereTurbidity');this.initGPUProfiler();this.buffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.buildingBuffer=gl.createBuffer();this.coastTex=gl.createTexture();
+this.uPBRAtlas=gl.getUniformLocation(prog,'materialAtlas');this.uPBREnabled=gl.getUniformLocation(prog,'materialAtlasEnabled');this.uPBRArray=gl.getUniformLocation(prog,'materialArrayReady');this.uMaterialArray=gl.getUniformLocation(prog,'materialArray');this.uTurbidity=gl.getUniformLocation(prog,'atmosphereTurbidity');if(!safe){try{this.initGPUProfiler()}catch(_){this.gpuFailures.push('GPU profiler disabled')}}this.buffer=gl.createBuffer();this.dynamicBuffer=gl.createBuffer();this.buildingBuffer=gl.createBuffer();this.coastTex=gl.createTexture();
 // Optional WebGL 1 shadow framebuffer; graceful fallback when GPU doesn't support it.
-try{const sh=gl.createProgram();gl.attachShader(sh,makeShader(gl,gl.VERTEX_SHADER,SHADOW_VS));gl.attachShader(sh,makeShader(gl,gl.FRAGMENT_SHADER,SHADOW_FS));gl.linkProgram(sh);
+try{if(safe&&!balanced)throw Error("safe shader disables shadows");const sh=gl.createProgram();gl.attachShader(sh,makeShader(gl,gl.VERTEX_SHADER,SHADOW_VS));gl.attachShader(sh,makeShader(gl,gl.FRAGMENT_SHADER,SHADOW_FS));gl.linkProgram(sh);
  if(gl.getProgramParameter(sh,gl.LINK_STATUS)){this.shadowProg=sh;this.shadowP=gl.getAttribLocation(sh,'p');this.shadowVP=gl.getUniformLocation(sh,'lightVP');}
 }catch(e){console.warn('Shadows unavailable',e);this.shadowsEnabled=false;}
 // Atmospheric gradient behind the geometry (WebGL 1, no external textures or dependencies).
-let sky=gl.createProgram();gl.attachShader(sky,makeShader(gl,gl.VERTEX_SHADER,SKY_VS));gl.attachShader(sky,makeShader(gl,gl.FRAGMENT_SHADER,SKY_FS));gl.linkProgram(sky);
+try{if(safe&&!balanced)throw Error('safe shader disables sky');let sky=gl.createProgram();gl.attachShader(sky,makeShader(gl,gl.VERTEX_SHADER,SKY_VS));gl.attachShader(sky,makeShader(gl,gl.FRAGMENT_SHADER,SKY_FS));gl.linkProgram(sky);
 if(gl.getProgramParameter(sky,gl.LINK_STATUS)){
 this.skyProg=sky;this.skyPosLoc=gl.getAttribLocation(sky,'skyPos');this.skyTime=gl.getUniformLocation(sky,'skyTime');this.skyWeather=gl.getUniformLocation(sky,'skyWeather');this.skySunLoc=gl.getUniformLocation(sky,'skySun');this.skyForwardLoc=gl.getUniformLocation(sky,'skyForward');this.skyRightLoc=gl.getUniformLocation(sky,'skyRight');this.skyUpLoc=gl.getUniformLocation(sky,'skyUp');this.skyAspectLoc=gl.getUniformLocation(sky,'skyAspect');this.skyTurbidityLoc=gl.getUniformLocation(sky,'skyTurbidity');this.skyBuffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
+}}catch(e){this.skyProg=null;this.gpuFailures.push('Optional sky disabled: '+String(e.message||e).slice(0,320));}
+gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);this.gpuSafeMode=safe;this.gpuBalancedMode=balanced;this.shaderProfile=mode;if(safe&&!balanced){
+ this.shadowsEnabled=false;this.shadowProg=null;this.skyProg=null;
+ this.postQuality='off';this.aaMode='native';this.waterMode='eco';this.reflectionQuality='off';
+ this.pbrArray=null;this.pbrAtlas=null;
+ this.gpuFailures.push('SAFE GPU: native canvas MSAA, no reflection/shadows');
+}else if(balanced){
+ this.shadowsEnabled=true;this.qualityEffects={shadows:true,reflections:true};
+ this.postQuality='fxaa';this.aaMode='hybrid';this.waterMode='balanced';this.reflectionQuality='medium';
+ this.pbrArray=null;this.pbrAtlas=null;
+ this.gpuFailures.push('BALANCED GPU: single cached shadow atlas + planar water reflection + MSAA/FXAA');
 }
-gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);this.bindEvents()}catch(err){
- // The WebGL context cannot be converted to 2D. Replace it with a fresh canvas.
- console.warn('TrussLab: WebGL initialization failed; using CPU renderer.',err);
- const replacement=this.canvas.cloneNode(false);
- this.canvas.replaceWith(replacement);
+this.msaaSamples=this.gl.getParameter(this.gl.SAMPLES)||0;};
+let gpuReady=false;
+/* Conservative default for Chrome/ANGLE drivers. The heavy material program
+ * can trigger a GPU reset on some systems even when a small WebGL draw works.
+ * Test the compact GPU pipeline BEFORE attempting advanced shaders; advanced
+ * is deliberately DISABLED in this diagnostic release after RTX/ANGLE lost-context reports.
+ * The compact BALANCED program can be opted into via ?trussBalanced=1.
+ * Note: once a GPU context is LOST, it is not safe to continue linking on it. */
+const gpuQuery=new URLSearchParams(location.search);
+const optInBalanced=gpuQuery.get('trussBalanced')==='1';
+const startup=(api)=>{
+ for(const mode of (optInBalanced?['balanced','safe']:['safe'])){
+  if(!this.gl||this.gl.isContextLost()){this.gpuFailures.push(api+' context LOST before '+mode+' shader');break;}
+  try{initializeGPU(mode);
+    if(this.gl.isContextLost())throw Error('context LOST after GPU initialization');
+    gpuReady=true;this.gpuFailures.push(api+' '+mode+' renderer READY');return true;
+  }catch(err){this.gpuFailures.push(api+' '+mode+' pipeline: '+String(err?.message||err).slice(0,1800));
+    console.warn('TrussLab: '+api+' '+mode+' GPU initialization failed',err);
+    if(this.gl.isContextLost()){this.gpuFailures.push(api+' CONTEXT_LOST_WEBGL — abort shader retries');break;}
+  }
+ }
+ return false;
+};
+startup(this.gpuBackend.api||'none');
+if(!gpuReady&&this.gpuBackend.api==='webgl2'){
+ // WebGL2 cannot turn into WebGL1 on the same canvas. Release it first,
+ // then replace ONLY the WebGL canvas and retry both shader pipelines.
+ try{this.gl?.getExtension('WEBGL_lose_context')?.loseContext()}catch(_){}
+ const next=this.canvas.cloneNode(false);this.canvas.replaceWith(next);this.canvas=next;
+ const fallbackSteps=[];this.gl=trussTryCanvasAPI(next,'webgl',fallbackSteps);
+ this.gpuBackend.attempts.push(...fallbackSteps);this.gpuFailures.push(...fallbackSteps.filter(x=>!x.includes('context created')));
+ if(this.gl){
+  this.gpuBackend.api='webgl';this.renderCoreCaps=RenderCoreCapabilities.detectGL(this.gl);
+  this.shadowsEnabled=true;this.shadowProg=null;this.skyProg=null;
+  startup('webgl');
+ }else this.gpuFailures.push('webgl fallback: no context on game canvas');
+}
+if(!gpuReady){
+ const replacement=this.canvas.cloneNode(false);this.canvas.replaceWith(replacement);
  this.canvas=replacement;this.gl=null;this.software=true;this.chunkedTerrain=false;this.trafficEnabled=false;
+ this.renderCoreCaps=RenderCoreCapabilities.detectGL(null);
  this.ctx=replacement.getContext('2d');
  if(!this.ctx)throw new Error('No 2D canvas context available.');
- this.patterns=this.makePatterns();this.bindEvents();
- this.message='Резервная 3D-отрисовка активна';
- }}
+ this.patterns=this.makePatterns();
+ this.message='GPU недоступен: '+this.gpuFailures.join(' / ').slice(0,450);
+}
+this.bindEvents();
+ }
 
  /** Continuous time-of-day lighting (visual simulation, no astronomical GIS ephemeris). */
  setSunHour(hour){
@@ -2696,13 +2958,13 @@ setPresetCamera(kind){
 
 step(dt){if(!this.keys)return;let {forward,right}=this.cameraBasis(),speed=(this.keys.ShiftLeft||this.keys.ShiftRight?3.6:1.8)*this.moveSpeed*(dt/16.67),flatF=norm([forward[0],0,forward[2]]),flatR=norm([right[0],0,right[2]]),move=[0,0,0];if(this.keys.KeyW)move=add(move,flatF);if(this.keys.KeyS)move=sub(move,flatF);if(this.keys.KeyA)move=sub(move,flatR);if(this.keys.KeyD)move=add(move,flatR);if(this.keys.KeyQ)move[1]-=1;if(this.keys.KeyE)move[1]+=1;if(Math.hypot(...move)>0){move=scale(norm(move),speed);this.camPos=add(this.camPos,move);let lim=this.worldSize*.67;this.camPos[0]=wClamp(this.camPos[0],-lim,lim);this.camPos[2]=wClamp(this.camPos[2],-lim,lim);this.camPos[1]=wClamp(this.camPos[1],1.1,Math.max(65,this.worldSize*.72))}}
  makePatterns(){let palette=['#49694b','#bfa87c','#765c46','#353f49','#9da9a6','#72868c','#3989a9','#547177','#756f69','#8d8880','#deded2','#52616c','#769dad','#a89472','#435c65','#44704c','#eed2a2','#35393e','#b9cbd0','#bd5742','#d0ded7','#bad0dc','#a76f48'];return palette.map((color,kind)=>{let c=document.createElement('canvas');c.width=64;c.height=64;let g=c.getContext('2d');g.fillStyle=color;g.fillRect(0,0,64,64);for(let j=0;j<320;j++){let x=(j*37.71+kind*17)%64,y=(j*19.57+kind*11)%64,alpha=.03+(j%7)*.012;g.fillStyle=j%3?'rgba(11,24,29,'+alpha+')':'rgba(255,255,239,'+alpha+')';g.fillRect(x,y,1+(j%3),1+(j%2))}if(kind===8||kind===9){g.strokeStyle='#171e2520';g.lineWidth=1;for(let y=0;y<=64;y+=11){g.beginPath();g.moveTo(0,y);g.lineTo(64,y);g.stroke()}if(kind===9)for(let x=0;x<=64;x+=23){g.beginPath();g.moveTo(x,0);g.lineTo(x,64);g.stroke()}}if(kind===0||kind===15){g.strokeStyle='#e8f3df26';for(let j=0;j<65;j++){let x=(j*47)%64,y=(j*31)%64;g.beginPath();g.moveTo(x,y);g.lineTo(x+1,y-3);g.stroke()}}return this.ctx.createPattern(c,'repeat')})}
- renderSoftware(w,h,ratio){let ctx=this.ctx,mesh=this.mesh.a.concat(this.buildingMesh.a,this.trafficMesh.a),eye=this.eye,{forward,right,up}=this.cameraBasis(),f=h/(2*Math.tan(Math.PI/6));ctx.setTransform(ratio,0,0,ratio,0,0);let sky=ctx.createLinearGradient(0,0,0,h),sunset=this.daylight==='sunset',night=this.daylight==='night';
+ renderSoftware(w,h,ratio){let ctx=this.ctx,sources=[this.mesh.a,this.buildingMesh.a,this.trafficMesh.a],eye=this.eye,{forward,right,up}=this.cameraBasis(),f=h/(2*Math.tan(Math.PI/6));ctx.setTransform(ratio,0,0,ratio,0,0);let sky=ctx.createLinearGradient(0,0,0,h),sunset=this.daylight==='sunset',night=this.daylight==='night';
 sky.addColorStop(0,night?'#15253b':sunset?'#6d729d':'#578caf');
 sky.addColorStop(.55,night?'#293c5c':sunset?'#efad8b':'#9ac4d7');
 sky.addColorStop(1,night?'#4a5967':sunset?'#e9cda6':'#c9d8d1');
 ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);let triangles=[];
- for(let i=0;i<mesh.length;i+=21){let pts=[],dep=0,faceNormal=mesh.slice(i+3,i+6),mid=[0,0,0],mat=Math.round(mesh[i+6]);for(let j=0;j<3;j++){let k=i+j*7,v=mesh.slice(k,k+3),q=sub(v,eye),z=dot(q,forward);if(z<.20){pts=[];break}pts.push([w/2+f*dot(q,right)/z,h/2-f*dot(q,up)/z]);dep+=z;mid=add(mid,v)}if(pts.length!==3)continue;mid=scale(mid,1/3);let light=Math.max(0,dot(norm(faceNormal),norm([-.47,.88,.34]))),shading=.76+.34*light,toned=Math.max(.25,shading+this.ambientLift)*(this.theme==='dark'?.92:1);triangles.push({pts,depth:dep/3,mat,toned,mid})}
- triangles.sort((a,b)=>b.depth-a.depth);let patterns=this.patterns;
+ for(const [index,mesh] of sources.entries()){const budget=[2000,850,350][index],stride=Math.max(1,Math.ceil(mesh.length/21/budget));for(let i=0;i<mesh.length;i+=21*stride){let pts=[],dep=0,faceNormal=mesh.slice(i+3,i+6),mid=[0,0,0],mat=Math.round(mesh[i+6]);for(let j=0;j<3;j++){let k=i+j*7,v=mesh.slice(k,k+3),q=sub(v,eye),z=dot(q,forward);if(z<.20){pts=[];break}pts.push([w/2+f*dot(q,right)/z,h/2-f*dot(q,up)/z]);dep+=z;mid=add(mid,v)}if(pts.length!==3)continue;mid=scale(mid,1/3);let light=Math.max(0,dot(norm(faceNormal),norm([-.47,.88,.34]))),shading=.76+.34*light,toned=Math.max(.25,shading+this.ambientLift)*(this.theme==='dark'?.92:1);triangles.push({pts,depth:dep/3,mat,toned,mid})}}
+ this.softwareDrawnTriangles=triangles.length;triangles.sort((a,b)=>b.depth-a.depth);let patterns=this.patterns;
  for(let q of triangles){let p=q.pts;ctx.beginPath();ctx.moveTo(p[0][0],p[0][1]);ctx.lineTo(p[1][0],p[1][1]);ctx.lineTo(p[2][0],p[2][1]);ctx.closePath();ctx.fillStyle=patterns[q.mat]||patterns[0];ctx.fill();ctx.fillStyle=q.toned<.9?'rgba(7,18,22,'+Math.min(.46,(1-q.toned)*.6)+')':'rgba(245,249,227,'+Math.min(.2,(q.toned-.9)*.12)+')';ctx.fill()}
  this.message=(this.map?'Керчь — Тузла — Тамань · GeoWorld 9.2':this.lastState.track==='foundation'?'3D дом и редактируемая поверхность грунта':'3D сцена моста, синхронизированная с 2D')+' · программный рендер без WebGL';
  }
@@ -3974,7 +4236,7 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
      Sea-bed is never fabricated, only surfaces above sea level are captured. */
  ensureReflectionTarget(){
   if(this.software||!this.map||this.waterMode==='eco'||!this.gl)return false;
-  const gl=this.gl,size=this.gpuBudgetMB<=128?192:this.gpuBudgetMB<=256?256:this.quality==='ultra'?512:this.quality==='high'?384:256;
+  const gl=this.gl,size=this.gpuBudgetMB<=128?192:this.gpuBudgetMB<=256?256:this.qualityReflectionDetail==='high'?768:this.quality==='ultra'?512:this.quality==='high'?384:256;
   if(this.reflection?.size===size)return true;
   if(this.reflection){gl.deleteTexture(this.reflection.texture);gl.deleteFramebuffer(this.reflection.fb);gl.deleteRenderbuffer(this.reflection.depth)}
   const texture=gl.createTexture(),fb=gl.createFramebuffer(),depth=gl.createRenderbuffer();
@@ -3996,6 +4258,7 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
   const view=this.cameraBasis().forward,look=add(pos,view),f=(v)=>[v[0],-2.96-v[1],v[2]];
   const mirrorPos=f(pos),mirrorTarget=f(look);
   const delta=r.view?Math.hypot(...sub(pos,r.view.pos)):Infinity;
+  if(r.ready&&this.qualityReflectionDetail==='high'&&now-r.updated<85)return true;
   if(r.ready&&now-r.updated<300&&delta<.65&&Math.abs(this.yaw-r.view.yaw)<.01&&Math.abs(this.pitch-r.view.pitch)<.01)return true;
   r.matrix=matmul(perspective(Math.PI/3,W/H,.13,900),lookAt(mirrorPos,mirrorTarget));
   // Prevent WebGL texture feedback: a render target must never be bound to a sampler while attached.
@@ -4015,7 +4278,7 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  /** Allocate RGBA-packed depth and a depth attachment for a static shadow atlas. */
  ensureShadowFramebuffer(){
   if(!this.gl||!this.shadowProg||!this.shadowsEnabled)return false;
-  const gl=this.gl,size=this.gpuBudgetMB<=128?1024:this.quality==='ultra'?2048:this.quality==='high'?1024:512;
+  const gl=this.gl,size=this.gpuBalancedMode?(this.gpuBudgetMB<=128?512:this.qualityShadowDetail==='fine'?(this.gpuBudgetMB<=256?1024:1536):1024):this.gpuBudgetMB<=128?1024:this.quality==='ultra'?2048:this.quality==='high'?1024:512;
   if(this.shadowMap&&this.shadowSize===size)return true;
   if(this.shadowMap){gl.deleteTexture(this.shadowMap);gl.deleteFramebuffer(this.shadowFbo);gl.deleteRenderbuffer(this.shadowDepth);this.shadowMap=null;this.shadowFbo=null;this.shadowDepth=null;this.shadowSize=0;}
   const tex=gl.createTexture(),fb=gl.createFramebuffer(),depth=gl.createRenderbuffer();
@@ -4063,6 +4326,26 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
   for(const tile of this.cityVisible)draw(tile.buffer,tile.count);
   gl.disableVertexAttribArray(this.shadowP);gl.bindFramebuffer(gl.FRAMEBUFFER,null);
  }
+ /** Balanced-only shadow map: one small cached render target; no 13kB master shader. */
+ renderQualityShadows(rig){
+  if(!this.gpuBalancedMode||!this.qualityEffects.shadows||!this.shadowsEnabled||this.daylight==='night'||!this.ensureShadowFramebuffer())return false;
+  const now=performance.now(),eye=this.camPos,forward=this.cameraBasis().forward;
+  const c=add(eye,scale(forward,80)),radius=this.qualityShadowDetail==='fine'?190:260;
+  const sun=norm(rig.sun),step=radius*2/this.shadowSize;
+  const right=norm(cross([0,1,0],sun));const up=norm(cross(sun,right));
+  const projected=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  const sx=Math.round(projected(c,right)/step)*step-projected(c,right);
+  const sy=Math.round(projected(c,up)/step)*step-projected(c,up);
+  const center=add(c,add(scale(right,sx),scale(up,sy)));
+  const shadowEye=add(center,scale(sun,410));
+  const need=this.shadowDirty||!this.shadowMatrix||!this.qualityShadowAnchor||this.qualityShadowRadius!==radius||Math.hypot(...sub(center,this.qualityShadowAnchor))>Math.max(1.2,step*2.5)||Math.hypot(...sub(sun,this.qualityShadowSun||sun))>.01;
+  if(need&&(now-(this.lastShadowDraw||0)>(this.qualityShadowDetail==='fine'?135:240)||!this.shadowMatrix)){
+   this.shadowMatrix=matmul(orthographic(-radius,radius,-radius,radius,2,1000),lookAt(shadowEye,center));
+   this.drawShadowContent(this.shadowMatrix,this.shadowFbo,this.shadowSize);
+   this.qualityShadowAnchor=center;this.qualityShadowSun=sun.slice();this.qualityShadowRadius=radius;this.lastShadowDraw=now;this.shadowDirty=false;this.shadowCascadeUpdates++;
+  }
+  return !!this.shadowMatrix;
+ }
  /** Refresh cached static shadows only on changes, not at traffic animation rate. */
  renderStaticShadows(rig){
   if(this.software||this.daylight==='night'||this.quality==='low'||!this.ensureCascades())return false;
@@ -4093,9 +4376,24 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  }
 
  render(state,rebuild=true){if(!this.ready)return;if(state)this.lastState=state;state=this.lastState;if(!state)return;
+ trussClarityCanvasLayout(this.canvas,this.clarityPreset);
  let gl=this.gl,w=this.canvas.clientWidth,h=this.canvas.clientHeight;if(!w||!h)return;
  let dpi=this.quality==='ultra'?2.25:this.quality==='high'?1.7:this.quality==='medium'?1.4:1;
- let ratio=Math.min((devicePixelRatio||1)*this.resolutionScale,this.software?1.25:dpi),W=Math.round(w*ratio),H=Math.round(h*ratio);
+ let ratio=Math.min((devicePixelRatio||1)*this.resolutionScale*(this.qualitySsaa||1),this.software?1.25:dpi*(this.qualitySsaa||1));
+ let W,H;
+ const presetPixels={'720p':[1280,720],'900p':[1600,900],'1080p':[1920,1080],'1440p':[2560,1440]};
+ const requested=(!this.software&&presetPixels[this.clarityPreset])||null;
+ if(this.gl){
+  const cap=this.qualityMaxTexture||(this.qualityMaxTexture=Math.min(8192,this.gl.getParameter(this.gl.MAX_RENDERBUFFER_SIZE)||4096,this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE)||4096));
+  const maxPixels=this.gpuBudgetMB<=128?1800000:this.gpuBudgetMB<=256?3200000:6400000;
+  if(requested){const limit=Math.min(1,cap/requested[0],cap/requested[1],Math.sqrt(maxPixels/(requested[0]*requested[1])));
+   W=Math.max(2,Math.floor(requested[0]*limit));H=Math.max(2,Math.floor(requested[1]*limit));
+   ratio=W/w;this.clarityLimited=limit<.9999;
+  }else{ratio=Math.min(ratio,cap/Math.max(w,h),Math.sqrt(maxPixels/(w*h)));this.clarityLimited=false;}
+ }
+ if(!requested){W=Math.max(2,Math.round(w*ratio));H=Math.max(2,Math.round(h*ratio));}
+ this.clarityRequested=requested?.slice()||null;this.clarityActual=[W,H];
+ this.qualityFramePixels=W*H;
  if(this.canvas.width!==W||this.canvas.height!==H){this.canvas.width=W;this.canvas.height=H}
  if(rebuild||this.sceneDirty){let buildStart=performance.now(),m=this.mesh;m.clear();this.makeLand(m,state);if(this.map)this.addKerch(m,state);else if(state.track==='foundation')this.addHouse(m,state);else this.addBridge(m,state);this.count=m.a.length/7;this.sceneDirty=false;this.bufferDirty=true;this.shadowDirty=true;this.staticBuilds++;this.stats.meshMs=performance.now()-buildStart;this.coastDirty=true;this.trafficDirty=true;}
  if(this.map)this.streamCity();
@@ -4105,13 +4403,13 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  const {forward}=this.cameraBasis(),eye=this.camPos.slice(),target=add(eye,forward);
  const proj=perspective(Math.PI/3,w/h,.13,900);
  if(this.postQuality==='taa'&&!this.software){
-  const jitter=[[0,0],[-.25,.25],[.25,-.25],[-.25,-.25],[.25,.25]][this.postFrame%5];
+  const jitter=[[0,0],[-.25,.125],[.125,-.375],[.375,.25],[-.375,-.125],[.25,-.25],[-.125,.375],[.0,-.5]][this.postFrame%8];
   proj[8]+=2*jitter[0]/W;proj[9]+=2*jitter[1]/H;
  }
  let vp=matmul(proj,lookAt(eye,target));this.vp=vp;this.eye=eye;this.focal=target;
  if(this.software){this.renderSoftware(w,h,ratio);this.recordFrame();return}
  const hasPost=this.ensurePost(W,H);
- gl.bindFramebuffer(gl.FRAMEBUFFER,hasPost?this.post.scene.fb:null);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,hasPost?(this.post.msaa?.fb||this.post.scene.fb):null);
  if(hasPost){for(const i of [0,1,2]){gl.activeTexture(gl.TEXTURE0+i);gl.bindTexture(gl.TEXTURE_2D,null)}}
  gl.viewport(0,0,W,H);let clear=this.daylight==='night'?[.055,.08,.15,1]:this.daylight==='sunset'?[.79,.66,.55,1]:[.59,.77,.87,1];gl.clearColor(...clear);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
  if(this.skyProg){gl.disable(gl.DEPTH_TEST);gl.useProgram(this.skyProg);gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.enableVertexAttribArray(this.skyPosLoc);gl.vertexAttribPointer(this.skyPosLoc,2,gl.FLOAT,false,8,0);gl.uniform1f(this.skyTime,performance.now()*.001);gl.uniform1f(this.skyWeather,this.daylight==='sunset'?1:this.daylight==='night'?2:0);
@@ -4120,7 +4418,7 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  gl.drawArrays(gl.TRIANGLES,0,6);gl.disableVertexAttribArray(this.skyPosLoc);gl.enable(gl.DEPTH_TEST);}
  gl.useProgram(this.prog);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
  if(this.bufferDirty){gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.mesh.a),gl.STATIC_DRAW);this.bufferDirty=false;this.shadowDirty=true;}this.updateCoastTexture();
- const rig=this.lightingRig();const shadowsActive=this.renderStaticShadows(rig);
+ const rig=this.lightingRig();const shadowsActive=this.gpuBalancedMode?this.renderQualityShadows(rig):this.renderStaticShadows(rig);
  gl.viewport(0,0,W,H);gl.useProgram(this.prog);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
  gl.uniformMatrix4fv(this.uLightVP,false,new Float32Array(this.shadowMatrix||matmul(orthographic(-310,310,-310,310,10,940),lookAt([0,400,0],[0,0,0]))));
  gl.uniformMatrix4fv(this.uLightVPNear,false,new Float32Array(this.cascades[0]?.matrix||this.shadowMatrix||this.vp));
@@ -4128,6 +4426,7 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  gl.uniform3fv(this.uCascadeSplits,new Float32Array(this.cascadeSplits));
  gl.uniform1f(this.uShadowOn,shadowsActive?1:0);gl.uniform1f(this.uAmbientLift,this.ambientLift);gl.uniform1f(this.uShadowOpacity,this.shadowOpacity);
  gl.uniform2f(this.uShadowTexel,1/Math.max(1,this.shadowSize),1/Math.max(1,this.shadowSize));
+ if(this.uShadowSoftness)gl.uniform1f(this.uShadowSoftness,this.qualitySoftShadows?1:0);if(this.uReflectionTexel)gl.uniform2f(this.uReflectionTexel,1/Math.max(1,this.reflection?.size||512),1/Math.max(1,this.reflection?.size||512));if(this.uReflectionFine)gl.uniform1f(this.uReflectionFine,this.qualityReflectionDetail==='high'?1:0);
  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.shadowMap||this.coastTex);gl.uniform1i(this.uShadowMap,1);
  gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,this.cascades[0]?.tex||this.coastTex);gl.uniform1i(this.uShadowNear,2);
  gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,this.cascades[1]?.tex||this.coastTex);gl.uniform1i(this.uShadowMid,3);
@@ -4143,8 +4442,8 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  gl.uniform1f(this.uWaterDetail,this.waterMode==='eco'?0:this.waterMode==='balanced'?1:2);
  this.ensureMaterialAtlas();gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,this.pbrAtlas||this.coastTex);gl.uniform1i(this.uPBRAtlas,4);gl.uniform1f(this.uPBREnabled,this.pbrAtlas?1:0);gl.uniform1f(this.uPBRArray,this.pbrArray?1:0);gl.uniform1f(this.uTurbidity,1.75);
  gl.activeTexture(gl.TEXTURE6);if(this.pbrArray)gl.bindTexture(gl.TEXTURE_2D_ARRAY,this.pbrArray);if(this.uMaterialArray)gl.uniform1i(this.uMaterialArray,6);
- this.updateReflection(vp,W,H);
- gl.bindFramebuffer(gl.FRAMEBUFFER,hasPost?this.post.scene.fb:null);gl.viewport(0,0,W,H);
+ if(!this.gpuBalancedMode||this.qualityEffects.reflections)this.updateReflection(vp,W,H);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,hasPost?(this.post.msaa?.fb||this.post.scene.fb):null);gl.viewport(0,0,W,H);
  // Reflection pass renders city/terrain buffers last. Restore ALL main vertex
  // attribute pointers before drawing the static bridge: otherwise the bridge
  // is interpreted as (and often clipped by) a tiny cached city-tile buffer.
@@ -4186,7 +4485,15 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
   gl.drawArrays(gl.TRIANGLES,0,this.trafficCount);
  }
  this.gpuTimerEnd();this.gpuTimerPoll();this.gpuStats.cpuDrawMs=performance.now()-cpuDrawStart;
- if(hasPost)this.compositeFrame(W,H);
+ if(hasPost){
+  if(this.post.msaa){
+   gl.bindFramebuffer(gl.READ_FRAMEBUFFER,this.post.msaa.fb);
+   gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,this.post.scene.fb);
+   gl.blitFramebuffer(0,0,W,H,0,0,W,H,gl.COLOR_BUFFER_BIT|(this.post.scene.depthTex?gl.DEPTH_BUFFER_BIT:0),gl.NEAREST);
+   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  }
+  this.compositeFrame(W,H);
+ }
  this.recordFrame();
  this.message=this.map?'Секторы побережья · WGS84≈ · трафик отдельно · FreeCam':state.track==='foundation'?'3D оснований и рельефа':'3D сцена моста · сценарий синхронизирован с 2D';
  }
@@ -4224,8 +4531,12 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  ensurePost(W,H){
   if(this.software||this.postQuality==='off'||!this.gl)return false;
   const gl=this.gl;
-  if(this.post?.w===W&&this.post?.h===H)return true;
-  if(this.post){for(const t of [this.post.scene,...this.post.history]){gl.deleteTexture(t.tex);gl.deleteFramebuffer(t.fb);if(t.depth)gl.deleteRenderbuffer(t.depth);if(t.depthTex)gl.deleteTexture(t.depthTex)}gl.deleteBuffer(this.post.quad);}
+  if(this.post?.w===W&&this.post?.h===H&&this.post?.aa===this.aaMode)return true;
+  if(this.post){
+  for(const t of [this.post.scene,...this.post.history]){gl.deleteTexture(t.tex);gl.deleteFramebuffer(t.fb);if(t.depth)gl.deleteRenderbuffer(t.depth);if(t.depthTex)gl.deleteTexture(t.depthTex)}
+  if(this.post.msaa){gl.deleteFramebuffer(this.post.msaa.fb);gl.deleteRenderbuffer(this.post.msaa.color);gl.deleteRenderbuffer(this.post.msaa.depth);}
+  gl.deleteBuffer(this.post.quad);this.post=null;
+ }
   if(!this.postProgram){
    try{
     const create=(fragment)=>{let prog=gl.createProgram();gl.attachShader(prog,makeShader(gl,gl.VERTEX_SHADER,POST_VS));gl.attachShader(prog,makeShader(gl,gl.FRAGMENT_SHADER,fragment));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));return prog};
@@ -4252,7 +4563,26 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
    return {tex,fb,depth:rb,depthTex};
   };
   try{const scene=create(true),history=[create(false),create(false)],quad=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,quad);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
-   this.post={scene,history,quad,w:W,h:H,current:0,valid:false,lastCamera:null,bytes:W*H*4*3+W*H*2};
+   let msaa=null;
+   const isGL2=typeof WebGL2RenderingContext!=='undefined'&&gl instanceof WebGL2RenderingContext;
+   if((this.aaMode==='hybrid'||this.aaMode==='temporal'||this.aaMode==='msaaonly')&&isGL2){
+    let fb=null,color=null,depth=null;
+    try{
+     const samples=Math.min(4,gl.getParameter(gl.MAX_SAMPLES)||0);
+     if(samples>=2){
+      fb=gl.createFramebuffer();color=gl.createRenderbuffer();depth=gl.createRenderbuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
+      gl.bindRenderbuffer(gl.RENDERBUFFER,color);gl.renderbufferStorageMultisample(gl.RENDERBUFFER,samples,gl.RGBA8,W,H);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.RENDERBUFFER,color);
+      gl.bindRenderbuffer(gl.RENDERBUFFER,depth);gl.renderbufferStorageMultisample(gl.RENDERBUFFER,samples,gl.DEPTH_COMPONENT24,W,H);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,depth);
+      if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('MSAA framebuffer incomplete');
+      msaa={fb,color,depth,samples};
+     }
+    }catch(err){if(fb)gl.deleteFramebuffer(fb);if(color)gl.deleteRenderbuffer(color);if(depth)gl.deleteRenderbuffer(depth);this.gpuFailures.push('MSAA offscreen fallback: '+String(err.message||err).slice(0,160));}
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.bindRenderbuffer(gl.RENDERBUFFER,null);
+   }
+   this.post={scene,history,msaa,quad,w:W,h:H,aa:this.aaMode,current:0,valid:false,lastCamera:null,bytes:W*H*4*3+W*H*2+(msaa?W*H*8*msaa.samples:0)};
    this.postResets++;gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.bindRenderbuffer(gl.RENDERBUFFER,null);return true;
   }catch(e){console.warn('Postprocess disabled',e);this.postQuality='off';gl.bindFramebuffer(gl.FRAMEBUFFER,null);return false;}
  }
@@ -4260,11 +4590,24 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
      A camera/scene cut invalidates history to avoid disocclusion trails. */
  compositeFrame(W,H){
   const gl=this.gl,p=this.post;if(!p||this.postQuality==='off')return;
+  if(this.postQuality==='copy'){
+   // Native MSAA resolve, a small sharpen-only pass. No FXAA, no TAA, no history blur.
+   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,W,H);gl.disable(gl.DEPTH_TEST);
+   gl.useProgram(this.copyProgram);gl.bindBuffer(gl.ARRAY_BUFFER,p.quad);
+   const loc=gl.getAttribLocation(this.copyProgram,'p');gl.enableVertexAttribArray(loc);
+   gl.vertexAttribPointer(loc,2,gl.FLOAT,false,8,0);
+   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,p.scene.tex);
+   gl.uniform1i(gl.getUniformLocation(this.copyProgram,'currentFrame'),0);
+   gl.uniform2f(gl.getUniformLocation(this.copyProgram,'texel'),1/W,1/H);
+   gl.uniform1f(gl.getUniformLocation(this.copyProgram,'sharp'),this.qualitySharpness||0);
+   gl.drawArrays(gl.TRIANGLES,0,6);gl.enable(gl.DEPTH_TEST);
+   p.valid=false;this.postFrame++;return;
+  }
   const taa=this.postQuality==='taa',next=(p.current+1)%2;
   const old=p.lastCamera,pos=this.camPos;
-  const stable=old&&Math.hypot(...sub(pos,old.p))<(p.scene.depthTex?5:.22)&&Math.abs(this.yaw-old.y)<(p.scene.depthTex?.10:.003)&&Math.abs(this.pitch-old.t)<(p.scene.depthTex?.10:.003);
+  const motion=old?Math.hypot(...sub(pos,old.p))+22*Math.abs(this.yaw-old.y)+22*Math.abs(this.pitch-old.t):Infinity;const stable=old&&motion<3.5&&!this.bufferDirty&&!this.sceneDirty&&!this.shadowDirty;
   const inv=invert4x4(this.vp);
-  const weight=taa&&p.valid&&stable&&inv&&!this.trafficDirty?this.taaHistoryStrength:0;
+  const weight=taa&&p.valid&&stable&&inv&&!this.trafficDirty?Math.max(.27,Math.min(.86,this.taaHistoryStrength-motion*.13)):0;
   if(taa){gl.bindFramebuffer(gl.FRAMEBUFFER,p.history[next].fb);}else{gl.bindFramebuffer(gl.FRAMEBUFFER,null);}
   gl.viewport(0,0,W,H);gl.disable(gl.DEPTH_TEST);gl.useProgram(this.postProgram);
   gl.bindBuffer(gl.ARRAY_BUFFER,p.quad);const loc=gl.getAttribLocation(this.postProgram,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,8,0);
@@ -4277,8 +4620,8 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
   gl.uniform1f(gl.getUniformLocation(this.postProgram,'depthAvailable'),p.scene.depthTex&&p.lastVP&&inv?1:0);
   gl.uniformMatrix4fv(gl.getUniformLocation(this.postProgram,'currentInvVP'),false,new Float32Array(inv||this.vp));
   gl.uniformMatrix4fv(gl.getUniformLocation(this.postProgram,'previousVP'),false,new Float32Array(p.lastVP||this.vp));
-  gl.uniform1f(gl.getUniformLocation(this.postProgram,'sharpen'),this.resolutionScale<.95?.23:.11);
-  gl.uniform1f(gl.getUniformLocation(this.postProgram,'edgeOn'),1);
+  gl.uniform1f(gl.getUniformLocation(this.postProgram,'sharpen'),Math.max(0,Math.min(.30,(this.qualitySharpness||0)+(this.resolutionScale<.95?.08:0))));
+  gl.uniform1f(gl.getUniformLocation(this.postProgram,'edgeOn'),1);gl.uniform1f(gl.getUniformLocation(this.postProgram,'fxaaStrength'),this.clarityFxaaStrength??.25);
   gl.drawArrays(gl.TRIANGLES,0,6);
   if(taa){
    gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.useProgram(this.copyProgram);
@@ -4442,6 +4785,10 @@ window.addEventListener('keyup',e=>{delete this.keys[e.code]});window.addEventLi
 
 const root=document.getElementById('app'),canvas=document.getElementById('stage'),g=canvas.getContext('2d');
 const world3d=new World3D(document.getElementById('stage-3d'));
+window.TrussLabGPUReport=function(){const gl=world3d.gl;let renderer='unknown',vendor='unknown',version='';
+ try{if(gl){const e=gl.getExtension('WEBGL_debug_renderer_info');renderer=e?gl.getParameter(e.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);vendor=e?gl.getParameter(e.UNMASKED_VENDOR_WEBGL):gl.getParameter(gl.VENDOR);version=gl.getParameter(gl.VERSION);}}catch(_){}
+ return {backend:world3d.software?'CPU Canvas2D':world3d.renderCoreCaps.backend,gpuApi:world3d.gpuBackend?.api||'none',renderer,vendor,version,webglAvailable:!!gl,gpuSafeMode:!!world3d.gpuSafeMode,shaderProfile:world3d.shaderProfile||'none',aaMode:world3d.aaMode,canvasAntialias:world3d.gl?.getContextAttributes()?.antialias??null,msaaSamples:world3d.post?.msaa?.samples||world3d.msaaSamples||0,postProcessing:world3d.postQuality,shadowsActive:!!world3d.shadowMatrix&&world3d.gpuBalancedMode&&world3d.qualityEffects.shadows,reflectionReady:!!world3d.reflection?.ready,contextLost:!!gl?.isContextLost(),startupPolicy:world3d.gpuBalancedMode?'balanced opt-in, safe fallback':'safe-first (default)',contextAttempts:world3d.gpuBackend.attempts.slice(),browser:{webgl1Interface:!!window.WebGLRenderingContext,webgl2Interface:!!window.WebGL2RenderingContext,protocol:location.protocol,userAgent:navigator.userAgent},errors:world3d.gpuFailures.slice(),fps:world3d.stats.fps,triangles:world3d.stats.triangles,cpuDrawnTriangles:world3d.softwareDrawnTriangles||0,quality:world3d.quality,resolutionScale:world3d.resolutionScale};};
+
 let theme='dark';try{theme=localStorage.getItem('trusslab-theme-v8')==='light'?'light':'dark'}catch(err){}document.documentElement.dataset.theme=theme;world3d.theme=theme;world3d.quality='ultra';
 const $=id=>document.getElementById(id),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),round=(n,d=1)=>Number(n).toFixed(d),money=n=>Math.round(n).toLocaleString('ru-RU'),escape=s=>String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const satelliteRefImg=()=>document.querySelector('#satellite-overlay img');
@@ -5070,7 +5417,7 @@ let last=0;function tick(t){if(atlas.active||region3d.active){requestAnimationFr
   const g=world3d.perfGovernor;
   $('tl-perf-report').textContent=`GPU ${world3d.framePolicy.toUpperCase()} · ${Math.round(world3d.resolutionScale*100)}% масштаба · ${world3d.stats.fps||'—'} FPS · ${Math.round(world3d.stats.triangles/1000)}K △ · буферы ≈${(world3d.estimateGPUMemory().ownedBytes/1048576).toFixed(1)} МиБ (оценка, не драйвер, бюджет ${world3d.gpuBudgetMB} МиБ) · GPU ${world3d.gpuStats.gpuMs===null?'н/д':world3d.gpuStats.gpuMs.toFixed(2)+' мс'} / CPU ${world3d.gpuStats.cpuDrawMs?.toFixed(1)||'—'} мс · CSM ${world3d.cascades.length+1} · отражения ${world3d.reflectionPasses} · TAA ${world3d.postQuality} · трафик ${world3d.trafficTargetHz()} Гц · перестроек ${world3d.staticBuilds} · регулятор ${g.changes}`;
  }
- if(elem)elem.textContent='FREECAM · GPS≈ '+formatLocation(P[0],P[2])+' · '+world3d.getRegionName(P[0])+' · выс. '+P[1].toFixed(1)+' · '+(world3d.stats.fps||'—')+' FPS · '+Math.round((world3d.stats.triangles||0)/1000)+'K △ · ТАЙЛЫ '+world3d.chunksVisible+'/'+world3d.chunkCache.size+' · ТРАФИК '+world3d.trafficUpdates+(world3d.software?' · CPU':world3d.shadowsEnabled?' · ТЕНИ':' · БЕЗ ТЕНЕЙ');drawMinimap();last=t}
+ if(elem)elem.textContent='FREECAM · GPS≈ '+formatLocation(P[0],P[2])+' · '+world3d.getRegionName(P[0])+' · выс. '+P[1].toFixed(1)+' · '+(world3d.stats.fps||'—')+' FPS · '+Math.round((world3d.software?world3d.softwareDrawnTriangles:world3d.stats.triangles||0)/1000)+'K △ · ТАЙЛЫ '+world3d.chunksVisible+'/'+world3d.chunkCache.size+' · ТРАФИК '+world3d.trafficUpdates+(world3d.software?' · CPU (GPU ERROR)':world3d.gpuSafeMode?' · '+world3d.renderCoreCaps.backend.toUpperCase()+(world3d.gpuBalancedMode?' BALANCED GPU':' SAFE GPU'):world3d.shadowsEnabled?' · '+world3d.renderCoreCaps.backend.toUpperCase()+' · ТЕНИ':' · '+world3d.renderCoreCaps.backend.toUpperCase()+' · БЕЗ ТЕНЕЙ');drawMinimap();last=t}
  }else if(st.analysis&&st.track==='bridge'&&t-last>80){draw();last=t}
  requestAnimationFrame(tick)}requestAnimationFrame(tick);
 function drawMinimap(){let c=$('minimap');if(!c||st.view!=='3d'||!world3d.map)return;let g=c.getContext('2d'),W=c.width,H=c.height,S=world3d.worldSize||220,half=S/2,bounds=world3d.kerchBounds?world3d.kerchBounds():{x0:-102,x1:102};let bg=g.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#214f66');bg.addColorStop(1,'#2d7488');g.fillStyle=bg;g.fillRect(0,0,W,H);
@@ -5101,6 +5448,9 @@ $('gpu-budget').addEventListener('change',e=>{world3d.setGPUBudgetMB(Number(e.ta
 $('traffic-rate').addEventListener('change',e=>{world3d.trafficRate=e.target.value;world3d.animBucket=-1;});
 $('frame-policy').addEventListener('change',e=>{world3d.setFramePolicy(e.target.value);world3d.render(worldPayload(),false);});
 $('perf-toggle').addEventListener('click',()=>{const p=$('tl-perf-report');p.hidden=!p.hidden;$('perf-toggle').setAttribute('aria-pressed',String(!p.hidden));});
+$('gpu-report-button').addEventListener('click',()=>{const report=JSON.stringify(window.TrussLabGPUReport(),null,2);window.prompt('GPU-диагностика TrussLab: скопируйте этот текст и пришлите в чат',report);});
+$('gpu-mode-toggle').textContent=new URLSearchParams(location.search).get('trussGL')==='webgl1'?'⚙️ GPU авто':'⚙️ WebGL1';
+$('gpu-mode-toggle').addEventListener('click',()=>{const url=new URL(location.href);if(url.searchParams.get('trussGL')==='webgl1')url.searchParams.delete('trussGL');else url.searchParams.set('trussGL','webgl1');location.assign(url.href);});
 $('view-save').addEventListener('click',()=>{world3d.saveView();note('Положение FreeCam сохранено','good');});
 $('view-load').addEventListener('click',()=>{if(!world3d.restoreView())note('Нет сохранённого вида','warn');else note('Камера восстановлена','good');});
 

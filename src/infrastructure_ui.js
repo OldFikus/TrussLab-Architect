@@ -105,3 +105,165 @@ c.addEventListener('wheel',e=>{e.preventDefault();const prev=scale;scale=clamp(s
 function frame(now){if(!visible)return;const dt=Math.min(.12,Math.max(0,(now-last)/1000));last=now;try{if(playing&&dt>0)sim.step(dt*36);draw();if(now-lastReport>350){refresh();lastReport=now}}catch(err){status('Симуляция: '+err.message);playing=false;}RAF=requestAnimationFrame(frame)}
 window.addEventListener('resize',()=>visible&&fit());
 })();
+
+/* CitySim 15.1 preview — aggregated, deterministic city services.
+   Populations/jobs are game abstractions; no claim of census-level modelling. */
+(function(root){'use strict';
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+const finite=x=>Number.isFinite(x);
+function nearestDistance(o,roads){let best=Infinity;
+ for(const road of roads){for(let i=1;i<road.points.length;i++){
+  const a=road.points[i-1],b=road.points[i],dx=b[0]-a[0],dz=b[1]-a[1],den=dx*dx+dz*dz;
+  const t=den?clamp(((o.x-a[0])*dx+(o.z-a[1])*dz)/den,0,1):0;
+  best=Math.min(best,Math.hypot(o.x-a[0]-dx*t,o.z-a[1]-dz*t));
+ }}return best;
+}
+class CitySimCore{
+ constructor(editor){if(!editor||!Array.isArray(editor.objects))throw Error('Editor required');this.editor=editor;this.day=0;this.population=0;this.treasury=250000;this.lastRevenue=0;this.lastExpenses=0;this.lastDay=0;this.baseTax=.12;this.cachedRevision=-1;this._plan=null;}
+ plan(){const e=this.editor; if(this.cachedRevision===e.revision&&this._plan)return this._plan;
+  const buildings=e.objects.filter(o=>o.type==='building'), roads=e.objects.filter(o=>o.type==='road'&&o.points?.length>1);
+  const homes=[],jobs=[],schools=[],clinics=[],shops=[],utilities=[];
+  let housing=0,jobSlots=0,schoolSeats=0,clinicSlots=0;
+  for(const o of buildings){const floors=clamp(Math.round(+o.floors||1),1,80),roadDistance=nearestDistance(o,roads);
+   const access=roads.length?clamp(1-Math.max(0,roadDistance-65)/450,.25,1):.55;
+   const b={id:o.id,x:+o.x,z:+o.z,roadDistance,access,kind:o.catalogId||'house'};
+   switch(o.catalogId){
+    case 'house':b.units=1;housing+=3*access;homes.push(b);break;
+    case 'apartment':b.units=floors*6;housing+=b.units*2.2*access;homes.push(b);break;
+    case 'office':b.jobs=floors*14;jobSlots+=b.jobs*access;jobs.push(b);break;
+    case 'warehouse':b.jobs=Math.max(6,Math.round(o.width*o.length/65));jobSlots+=b.jobs*access;jobs.push(b);break;
+    case 'shop':b.jobs=8*floors;jobSlots+=b.jobs*access;jobs.push(b);shops.push(b);break;
+    case 'school':b.seats=125*floors;schoolSeats+=b.seats;schools.push(b);break;
+    case 'clinic':b.slots=130*floors;clinicSlots+=b.slots;clinics.push(b);break;
+    case 'substation':case 'water-pump': utilities.push(b);break;
+   }
+  }
+  const proximity=(builds,radius)=>{if(!homes.length||!builds.length)return 0;let total=0,covered=0;
+   for(const h of homes){let count=h.units||1;total+=count;
+    if(builds.some(s=>Math.hypot(h.x-s.x,h.z-s.z)<=radius))covered+=count;
+   }return total?covered/total:0;
+  };
+  const out={housingCapacity:Math.floor(housing),jobCapacity:Math.floor(jobSlots),schoolSeats,clinicSlots,homeCount:homes.length,commercialCount:shops.length,workplaces:jobs.length,roads:roads.length,roadKm:roads.reduce((s,o)=>s+o.points.slice(1).reduce((n,p,i)=>n+Math.hypot(p[0]-o.points[i][0],p[1]-o.points[i][1]),0)/1000,0),schoolCoverage:proximity(schools,900),healthCoverage:proximity(clinics,1400),schools:schools.length,clinics:clinics.length, utilities:utilities.length};
+  this._plan=out;this.cachedRevision=e.revision;return out;
+ }
+ step(days=1){if(!finite(days)||days<0||days>365)throw Error('Invalid duration');
+  const p=this.plan();for(let k=0;k<Math.floor(days);k++){
+   const target=Math.min(p.housingCapacity,Math.round(p.jobCapacity/.43 + p.housingCapacity*.12));
+   const inward=target>this.population?clamp((target-this.population)*.055+1,0,Math.max(1,target-this.population)): -Math.min(this.population-target,(this.population-target)*.03+1);
+   this.population=Math.round(clamp(this.population+inward,0,p.housingCapacity));
+   const employed=Math.min(Math.round(this.population*.47),p.jobCapacity);
+   this.lastRevenue=Math.round(this.population*.8*this.baseTax*15+employed*.45);
+   this.lastExpenses=Math.round((p.roadKm*6)+(p.schools*110)+(p.clinics*140)+this.population*.018);
+   this.treasury+=this.lastRevenue-this.lastExpenses;this.day++;
+  }this.lastDay=this.day;return this.report();
+ }
+ report(){const p=this.plan(),employed=Math.min(Math.round(this.population*.47),p.jobCapacity);
+  return {...p,day:this.day,population:this.population,households:Math.round(this.population/2.35),employed,unemployed:Math.max(0,Math.round(this.population*.47)-employed),housingDemand:Math.max(0,Math.round((p.jobCapacity/.47)-p.housingCapacity)),treasury:Math.round(this.treasury),revenue:this.lastRevenue,expenses:this.lastExpenses,schoolCoverage:p.schoolCoverage,healthCoverage:p.healthCoverage};
+ }
+ export(){return {format:'TrussLab-CitySim',version:1,day:this.day,population:this.population,treasury:this.treasury,lastRevenue:this.lastRevenue,lastExpenses:this.lastExpenses,baseTax:this.baseTax};}
+ import(d){if(!d||d.format!=='TrussLab-CitySim'||d.version!==1||![d.day,d.population,d.treasury,d.lastRevenue,d.lastExpenses,d.baseTax].every(finite)||d.day<0||d.day>1e7||d.population<0||d.population>1e8||d.baseTax<0||d.baseTax>1)throw Error('Unsupported CitySim file');
+  this.day=d.day;this.population=d.population;this.treasury=d.treasury;this.lastRevenue=d.lastRevenue;this.lastExpenses=d.lastExpenses;this.baseTax=d.baseTax;this._plan=null;return this.report();}
+}
+root.TrussLabCitySimCore=CitySimCore;
+})(typeof globalThis!=='undefined'?globalThis:this);
+
+/* TrussLab 15.1 — editable region in the real 3D viewport; CitySim dashboard.
+   Build operations use original georeferenced WorldEditor objects. No network. */
+(function(){'use strict';
+if(typeof document==='undefined'||typeof region3d==='undefined'||!globalThis.trusslabEditor||!globalThis.TrussLabCitySimCore)return;
+const editor=globalThis.trusslabEditor,sim=new globalThis.TrussLabCitySimCore(editor);
+globalThis.trusslabCitySim=sim;
+const $=id=>document.getElementById(id),ui=document.createElement('section');
+let active=false,tool='camera',lineStart=null,pointer=null,model='house',autosaveTime=0;
+ui.id='citysim-controls';ui.hidden=true;ui.innerHTML=`
+<div class="cs-header"><strong>🏙️ WORLDMAP · <span id="cs-tool-name">ОБЗОР</span></strong><button id="cs-hide" title="Свернуть панель">▾</button></div>
+<div id="cs-body">
+<div class="cs-info">Редактируйте непосредственно 3D-рельеф. Метры ENU, координаты приблизительные; исходный DEM не изменяется.</div>
+<div class="cs-tools">
+ <button data-cs-tool="camera" class="selected">✥ Обзор</button><button data-cs-tool="house">⌂ Дом</button><button data-cs-tool="apartment">▥ Жилой дом</button><button data-cs-tool="office">▣ Офис</button>
+ <button data-cs-tool="shop">▤ Магазин</button><button data-cs-tool="school">▦ Школа</button><button data-cs-tool="clinic">✚ Клиника</button><button data-cs-tool="road">═ Дорога</button><button data-cs-tool="rail">≋ Рельсы</button>
+ <button data-cs-tool="raise">⛰ Поднять</button><button data-cs-tool="lower">⛏ Опустить</button>
+</div>
+<div class="cs-settings"><label>Радиус <input id="cs-radius" type="number" min="10" max="450" value="65" step="5"> м</label><label>Высота <input id="cs-height" type="number" min="0.2" max="15" value="3" step="0.5"> м</label></div>
+<div class="cs-actions"><button id="cs-finish">✓ Линия</button><button id="cs-cancel">× Отмена линии</button><button id="cs-undo">↶ Правка</button><button id="cs-redo">↷ Правка</button><button id="cs-2d">▦ 2D редактор</button></div>
+<div class="cs-metrics"><b>15.1 / АГРЕГИРОВАННЫЙ ГОРОД</b><div class="cs-numbers"><div><strong id="cs-pop">0</strong><small>жителей</small></div><div><strong id="cs-jobs">0</strong><small>рабочих мест</small></div><div><strong id="cs-home">0</strong><small>вместимость жилья</small></div><div><strong id="cs-budget">250 000</strong><small>бюджет, ₮</small></div></div><div id="cs-services">Школы 0% · Медицина 0%</div></div>
+<div class="cs-actions"><button id="cs-day">▶ +30 дней</button><button id="cs-save">↓ Сохранить</button><button id="cs-import">↑ Загрузить</button><button id="cs-demo">＋ Демо-квартал</button></div>
+<div class="cs-status" id="cs-status" role="status">Выбери инструмент. В 3D нажми на сушу для строительства. Перетаскивание — камера.</div>
+</div><input id="cs-file" type="file" accept=".json,application/json" hidden>
+`;
+$('region3d-overlay').appendChild(ui);
+const launch=document.createElement('button');launch.id='citysim-launch';launch.type='button';launch.textContent='🏙️ WorldMap 3D';launch.title='Строить города прямо на метрической 3D-карте';
+const nav=document.querySelector('.scene-header .views');(nav||document.querySelector('.topbar')||document.body).appendChild(launch);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const note=s=>{const e=$('cs-status');if(e)e.textContent=s;};
+function refresh(){const r=sim.report();$('cs-pop').textContent=r.population.toLocaleString('ru-RU');$('cs-jobs').textContent=r.jobCapacity.toLocaleString('ru-RU');$('cs-home').textContent=r.housingCapacity.toLocaleString('ru-RU');$('cs-budget').textContent=r.treasury.toLocaleString('ru-RU');$('cs-services').textContent=`Школы ${(r.schoolCoverage*100).toFixed(0)}% · Медицина ${(r.healthCoverage*100).toFixed(0)}% · Дороги ${r.roadKm.toFixed(1)} км · День ${r.day}`;}
+function switchTool(t){tool=t;lineStart=null;ui.querySelectorAll('[data-cs-tool]').forEach(b=>b.classList.toggle('selected',b.dataset.csTool===t));$('cs-tool-name').textContent=({'camera':'ОБЗОР','house':'ДОМ','apartment':'ЖИЛОЙ ДОМ','office':'ОФИС','shop':'МАГАЗИН','school':'ШКОЛА','clinic':'КЛИНИКА','road':'ДОРОГА','rail':'Ж/Д','raise':'ПОДЪЁМ','lower':'ВЫЕМКА'})[t]||t;region3d.assetEditMode=false; if(t!=='camera'&&window.innerWidth<=700){ui.classList.add('collapsed');$('cs-hide').textContent='▴';}note(t==='camera'?'Перетаскивание вращает FreeCam; колесо — пролёт.':t==='road'||t==='rail'?'Поставь первую точку на суше, затем вторую. Далее продолжай маршрут.':'Нажми на сушу в 3D. Для вращения камеры перетаскивай.');}
+function setVisible(yes){active=yes;ui.hidden=!yes;if(yes){refresh();switchTool('camera');}else{lineStart=null;}}
+function open(){if(globalThis.TrussLabWorldEditorUI)globalThis.TrussLabWorldEditorUI.close();if(globalThis.TrussLabInfrastructureUI?.close)globalThis.TrussLabInfrastructureUI.close();
+ region3d.geoPack=world3d.geoPack;region3d.open(45.32503,36.47020);
+ // Start in an elevated construction view; this remains an existing geographic area.
+ region3d.pitch=-.96;region3d.cam.y=Math.max(region3d.cam.y,190);region3d.assetEditMode=false;setVisible(true);
+}
+function makeHit(sx=.5,sy=.5){const rect=region3d.canvas.getBoundingClientRect();const hit=regionAssetRaycast(region3d.geoPack,region3d.cam,region3d.forward(),{screenX:sx,screenY:sy,aspect:rect.width/rect.height,coordinateMode:'ENU',maxDistance:6000});
+ if(!hit||!Number.isFinite(hit.lat)||!Number.isFinite(hit.lon))return null;
+ const loc=editor.local(hit.lat,hit.lon);if(!loc.every(Number.isFinite))return null;return {x:loc[0],z:loc[1],lat:hit.lat,lon:hit.lon,height:hit.height};}
+function apply(hit){if(!hit){note('Нет точки на известной суше. Направь камеру вниз или выбери «Керчь». На воде строительство не разрешено.');return;}
+ const {x,z}=hit;
+ if(tool==='camera')return;
+ if(tool==='raise'||tool==='lower'){
+  const radius=clamp(Number($('cs-radius').value)||65,10,450),amount=clamp(Number($('cs-height').value)||3,.2,15);
+  editor.paintTerrain(x,z,radius,amount,tool==='raise'?'raise':'lower');note(`${tool==='raise'?'Рельеф поднят':'Рельеф понижен'} на ${amount} м в центре кисти ${radius} м. Исходный DSM сохранён.`);
+ }else if(tool==='road'||tool==='rail'){
+  if(!lineStart){lineStart=[x,z];note('Начало линии установлено. Нажми вторую точку в 3D.');return;}
+  if(Math.hypot(x-lineStart[0],z-lineStart[1])<3){note('Точки дороги слишком близко.');return;}
+  editor.addPath(tool,[lineStart,[x,z]],tool==='road'?{width:9,label:'Новая улица',speedKph:50}:{width:4,label:'Двухпутный участок',tracks:2});lineStart=[x,z];note('Сегмент создан. Следующий клик продолжит маршрут, «× Отмена линии» закончит.');
+ }else{
+  const validation=editor.validatePlacement(tool,x,z);if(!validation.ok)throw Error(validation.reason);
+  const o=editor.addModel(tool,x,z,{label:editor.catalog.find(e=>e.id===tool)?.name||tool});
+  note(`Объект ${o.label} построен · ${hit.lat.toFixed(5)}°N ${hit.lon.toFixed(5)}°E · сохранён в WorldEditor`);
+ }
+ refresh();autoSave();
+}
+function screenHit(e){const r=region3d.canvas.getBoundingClientRect();return makeHit((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height);}
+region3d.canvas.addEventListener('pointerdown',e=>{if(!active||!region3d.active||e.button!==0)return;pointer={id:e.pointerId,x:e.clientX,y:e.clientY,moved:0};});
+region3d.canvas.addEventListener('pointermove',e=>{if(!pointer||e.pointerId!==pointer.id)return;pointer.moved+=Math.hypot(e.clientX-pointer.x,e.clientY-pointer.y);pointer.x=e.clientX;pointer.y=e.clientY;});
+region3d.canvas.addEventListener('pointerup',e=>{if(!pointer||pointer.id!==e.pointerId)return;const click=pointer.moved<7;pointer=null;if(!active||!region3d.active||!click||tool==='camera')return;
+ try{apply(screenHit(e));}catch(err){note('Ошибка: '+err.message);}});
+region3d.canvas.addEventListener('pointercancel',()=>pointer=null);
+function save(){const data={format:'TrussLab-CityWorld',version:1,editor:editor.export(),citysim:sim.export()};const str=JSON.stringify(data);const blob=new Blob([str],{type:'application/json'}),url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='trusslab_cityworld_15_1.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);note('Проект сохранён в JSON. Исходный DEM не меняется.');}
+function autoSave(){try{const s=JSON.stringify({format:'TrussLab-CityWorld',version:1,editor:editor.export(),citysim:sim.export()});if(s.length<2_200_000)localStorage.setItem('trusslab_cityworld_preview',s);}catch(_){}}
+function restore(data){if(!data||data.format!=='TrussLab-CityWorld'||data.version!==1)throw Error('Нужен проект TrussLab-CityWorld');if(JSON.stringify(data).length>6_000_000)throw Error('Файл слишком большой');editor.import(data.editor);sim.import(data.citysim);lineStart=null;refresh();autoSave();note('Сохранённые здания, дороги, рельеф и городская статистика восстановлены.');}
+function demo(){// Place a small, fictional quarter near a DEM-verified land point.
+ const base=makeHit(.5,.58)||makeHit(.5,.7);
+ if(!base){note('Для демо посмотри вниз на сушу, затем повтори.');return;}
+ const {x,z}=base;if(editor.objects.some(o=>o.label==='CITYSIM 15.1 DEMO')){note('Демо-квартал уже построен, используй кисть или другие инструменты.');return;}
+ const onGround=(a,b)=>{const g=metricGround(region3d.geoPack,a,b);return g.measured&&g.land};
+ const layout=[['apartment',-85,-35],['house',-55,35],['house',-15,40],['office',85,-40],['shop',45,38],['school',120,55],['clinic',150,110]];
+ let count=0;for(const [id,dx,dz] of layout){if(!onGround(x+dx,z+dz))continue;const o=editor.addModel(id,x+dx,z+dz,{label:count===0?'CITYSIM 15.1 DEMO':id});count++;}
+ if(onGround(x-100,z)&&onGround(x+140,z))editor.addPath('road',[[x-100,z],[x+140,z]],{width:9,label:'Учебная улица',speedKph:45});
+ sim.step(30);refresh();autoSave();note(`Демо-квартал: ${count} построек; прошло 30 игровых дней. География региона остаётся исходной.`);
+}
+ui.addEventListener('click',e=>{const button=e.target.closest('button');if(!button)return;
+ try{const t=button.dataset.csTool;if(t){switchTool(t);return;}
+ switch(button.id){
+  case 'cs-hide':ui.classList.toggle('collapsed');button.textContent=ui.classList.contains('collapsed')?'▴':'▾';break;
+  case 'cs-finish':lineStart=null;note('Текущая линия завершена.');break;
+  case 'cs-cancel':lineStart=null;note('Продолжение линии отменено. Созданные сегменты сохранены.');break;
+  case 'cs-undo':editor.undo();lineStart=null;refresh();autoSave();note('Последняя правка отменена.');break;
+  case 'cs-redo':editor.redo();refresh();autoSave();note('Правка восстановлена.');break;
+  case 'cs-2d':region3d.close();setVisible(false);globalThis.TrussLabWorldEditorUI.open();break;
+  case 'cs-day':sim.step(30);refresh();autoSave();note('Симуляция продвинута на 30 суток. Это игровая агрегированная модель.');break;
+  case 'cs-save':save();break;
+  case 'cs-import':$('cs-file').click();break;
+  case 'cs-demo':demo();break;
+ }
+ }catch(err){note('Ошибка: '+err.message);}
+});
+$('cs-file').addEventListener('change',async e=>{try{const f=e.target.files?.[0];if(!f)return;if(f.size>6_000_000)throw Error('Файл слишком большой');restore(JSON.parse(await f.text()));}catch(err){note('Ошибка импорта: '+err.message);}e.target.value='';});
+launch.addEventListener('click',open);
+// Keep panel state consistent if the Region3D close button is used directly.
+const previousClose=region3d.close.bind(region3d);region3d.close=function(...args){setVisible(false);return previousClose(...args);};
+try{const saved=localStorage.getItem('trusslab_cityworld_preview');if(saved&&saved.length<2_200_000)restore(JSON.parse(saved));}catch(_){/* private mode */}
+refresh();
+globalThis.TrussLabCityWorld={open,apply,makeHit,save,restore,demo,core:sim,editor,switchTool};
+})();

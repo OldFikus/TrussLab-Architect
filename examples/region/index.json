@@ -1,0 +1,33 @@
+{
+  "type": "TrussLabPlanetRegion",
+  "version": 1,
+  "id": "training-harbour",
+  "name": "Учебная гавань",
+  "bounds": [
+    -0.01,
+    -0.01,
+    0.02,
+    0.02
+  ],
+  "center": [
+    0.005,
+    0.005
+  ],
+  "source": {
+    "attribution": "TrussLab · синтетическая геометрия",
+    "license": "CC0-1.0",
+    "quality": "demo"
+  },
+  "index": {
+    "type": "TrussLabRegionIndex",
+    "version": 1,
+    "projection": "EPSG:3857",
+    "tileSizeMeters": 2048,
+    "tiles": {
+      "0:0": {
+        "path": "tiles/0_0.geojson",
+        "features": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+/* WorldStream 15.10: extra regional editor controls, mobile safe. */
+#wv-panel{margin:10px 0 5px;border:1px solid #467c82;border-radius:9px;background:#112b35;padding:9px;color:#dceee7}
+#wv-panel>summary{cursor:pointer;font-weight:750;font-size:12px;color:#e8cfa1;padding:4px 0;touch-action:manipulation}
+#wv-panel button{background:#1a4650;color:#e5f6ed;border:1px solid #477680;border-radius:7px;min-height:34px;padding:6px;font-size:11px}
+#wv-panel .wv-region-toggle{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0 6px}
+#wv-panel button.wv-active{background:#8b7553;color:white;border-color:#e4c48f;font-weight:700}
+#wv-panel .wv-selects{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+#wv-panel .wv-selects label{font-size:10px;color:#b6ced1;display:block}
+#wv-panel select{font-size:11px;width:100%;max-width:100%;padding:6px 4px;background:#183943;color:#e3f1e9;border:1px solid #4b7880;border-radius:6px;margin-top:5px}
+#wv-panel #wv-region-info{font-size:11px;line-height:1.4;color:#bddad1}
+#wv-panel .wv-check{display:flex;gap:6px;align-items:center;font-size:11px;line-height:1.4;margin:10px 0}
+#wv-panel .wv-check input{width:auto;margin:0;accent-color:#d6b87f}
+#wv-panel .wv-buttons{display:flex;gap:6px}#wv-panel .wv-buttons button{flex:1}
+#wv-panel #wv-hud{margin-top:9px;padding:7px;color:#ebcea4;background:#25434a;border-radius:5px;font-size:10px}
+#wv-panel .wv-disclaimer{font-size:10px;color:#9fbdc5;margin:8px 0 0;line-height:1.5}
+@media(max-width:700px){#wv-panel{margin:6px 0;padding:7px}#wv-panel .wv-region-toggle button{font-size:10px;padding:4px}#wv-panel .wv-selects{grid-template-columns:1fr 1fr}#wv-panel>summary{font-size:11px}}

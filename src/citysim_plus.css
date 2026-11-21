@@ -1,0 +1,37 @@
+/* CitySim 15.2–15.9: compact architect's in-engine dashboards. */
+#csplus{margin:10px 0 2px;border:1px solid #58797e;border-radius:11px;background:#0c2831;color:#dcefe9;font:12px/1.5 system-ui,sans-serif;contain:layout style}
+#csplus>summary{cursor:pointer;list-style:none;padding:11px 10px;color:#f3d399;background:#1a3b42;font-weight:750;letter-spacing:.025em;border-radius:10px}
+#csplus>summary::-webkit-details-marker{display:none}
+#csplus>summary::before{content:'▾';margin-right:7px;color:#addbd1}#csplus:not([open])>summary::before{content:'▸'}
+#csplus-alert{float:right;color:#b9d5d3}
+#csplus-content{padding:7px 9px 11px}
+#csplus button,#csplus input,#csplus select{font:inherit}
+#csplus button{background:#22434b;color:#dbf0ee;border:1px solid #54828a;border-radius:7px;padding:7px 5px;min-height:30px;cursor:pointer;line-height:1.25}
+#csplus button:hover{border-color:#e9c48e;background:#315963}#csplus button.csp-active,#csplus button.csp-current{background:#c3a16f;border-color:#ecd1a5;color:#11242d;font-weight:800}
+#csplus button:disabled{opacity:.45}
+#csplus input[type=number],#csplus input[type=text],#csplus input:not([type]),#csplus select{width:100%;background:#183942;color:#f2ece2;border:1px solid #4b737a;border-radius:6px;padding:6px;max-width:100%}
+#csplus input[type=checkbox]{accent-color:#dfb676}#csplus input[type=range]{width:80px;accent-color:#dfb676}
+#csplus .csp-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-bottom:9px}
+#csplus .csp-tabs button{font-size:10px;padding:7px 4px;min-width:0;white-space:normal}
+#csplus .csp-page[hidden]{display:none}
+#csplus .csp-kpi{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#csplus .csp-kpi>div{padding:7px;background:#183942;border:1px solid #365b65;border-radius:7px;min-width:0}
+#csplus .csp-kpi b{display:block;color:#eec88c;font-size:17px;line-height:1.2}
+#csplus .csp-kpi small{display:block;color:#b6d3d5;font-size:10px;margin-top:3px}
+#csplus .csp-sublabel{font-size:10px;color:#d7b781;letter-spacing:1px;margin:12px 0 6px;font-weight:800;text-transform:uppercase}
+#csplus .csp-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+#csplus .csp-rates{margin:8px 0}
+#csplus .csp-rates label{display:grid;grid-template-columns:1fr 90px 30px;align-items:center;gap:3px;margin:5px 0;color:#d0e0e0;font-size:11px}
+#csplus label{display:block;margin:7px 0;color:#ccdbdd;font-size:11px}
+#csplus .csp-actions{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}
+#csplus .csp-actions>button{flex:1 1 75px}
+#csplus .csp-note{background:#12343d;border:1px solid #3c6369;border-radius:6px;padding:8px;margin:9px 0;color:#c1d3d4;line-height:1.5;font-size:10px;overflow-wrap:anywhere}
+#csplus .csp-scroll{background:#132d37;border:1px solid #375b64;border-radius:7px;max-height:132px;overflow-y:auto;padding:6px;color:#cbdbd9}
+#csplus .csp-scroll label{display:flex;align-items:center;gap:5px;overflow-wrap:anywhere;margin:2px 0}
+#csplus .csp-settings{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+#csplus .csp-settings label{font-size:10px}
+#csplus #csp-sparkline{width:100%;height:100px;background:#122d39;border-radius:8px;max-height:100px}
+#csplus #csp-status{min-height:29px;margin-top:11px;background:#24434c;border-left:3px solid #d6a46f;padding:7px;color:#dfebdf;font-size:11px}
+#csp-world-overlay{position:absolute;z-index:6;pointer-events:none;max-width:none;max-height:none;display:block}
+#csp-world-overlay[hidden]{display:none!important}
+@media(max-width:700px){#csplus{margin-top:7px}#csplus .csp-kpi b{font-size:15px}#csplus .csp-tabs button{font-size:10px;min-height:30px;padding:5px 4px}#csplus .csp-tools button{min-height:33px}#csplus .csp-settings{grid-template-columns:1fr 1fr}#csplus .csp-settings label{margin:3px 0}}

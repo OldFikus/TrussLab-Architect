@@ -1,74 +1,44 @@
-name: Build and publish TrussLab 15.0
-
+name: Test and publish PlanetStream
 on:
   push:
     branches: [main]
     paths:
       - 'src/**'
-      - 'tools/build.py'
-      - 'tests/test_worldeditor_core.cjs'
+      - 'tests/**'
+      - 'tools/**'
+      - 'examples/**'
       - '.github/workflows/publish-release.yml'
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   release:
-    if: github.repository == 'OldFikus/TrussLab-Architect'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Syntax checks
+          python-version: '3.12'
+      - name: Validate sources and simulation
         run: |
-          for file in src/game.js src/rendercore/*.js src/worldeditor*.js src/infrastructure*.js; do node --check "$file"; done
-      - name: WorldEditor regression tests
+          find src -name '*.js' -exec node --check {} \;
+          for test in tests/*.cjs; do node "$test"; done
+      - name: Build and test both standalone profiles
         run: |
-          node tests/test_worldeditor_core.cjs
-          node tests/test_wgs84_alignment.cjs
-          node tests/test_infrastructure.cjs
-          node tests/test_infrastructure_stress.cjs
-      - name: Build release assets
-        run: python tools/build.py
-      - name: Validate HTML and ZIPs
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          from zipfile import ZipFile
-          root=Path('dist')
-          html=root/'TrussLab_Architect_15_0.html'
-          data=html.read_text(encoding='utf8')
-          assert len(data)>1_800_000
-          assert '<title>TrussLab Architect 15.0 — InfrastructureSim</title>' in data
-          for k in ('TrussLabWorldEditorCore','TrussLabInfrastructureSim','infra-root','worldeditor-open','we-root','region3d-open','earthworks-toggle'):
-              assert k in data,k
-          for name in ('TrussLab_Architect_15_0_Portable.zip','TrussLab_Architect_15_0_Source.zip'):
-              with ZipFile(root/name) as z: assert z.testzip() is None
-          print('InfrastructureSim 15.0 artifacts verified')
-          PY
-      - name: Publish GitHub Release v15.0.0
+          python tools/build.py
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+          python tests/test_planetstream.py
+          for archive in dist/*.zip; do unzip -tq "$archive"; done
+      - name: Publish tested build
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v15.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'Release v15.0.0 exists. Refusing to overwrite its immutable files.'
-          else
-            gh release create v15.0.0 \
-              dist/TrussLab_Architect_15_0.html \
-              dist/TrussLab_Architect_15_0_Portable.zip \
-              dist/TrussLab_Architect_15_0_Source.zip \
-              --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" \
-              --title 'TrussLab Architect 15.0 — InfrastructureSim' \
-              --notes-file docs/RELEASE_15_RU.md \
-              --latest
+          version=$(python -c 'from tools.build import VERSION; print(VERSION)')
+          tag="v${version}.0"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" dist/* --target "$GITHUB_SHA" --title "TrussLab Architect $version — PlanetStream" --notes-file docs/PLANETSTREAM_RU.md
           fi

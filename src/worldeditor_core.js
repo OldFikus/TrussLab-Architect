@@ -34,6 +34,8 @@ const CATALOG=[
 {id:'office',name:'Офис',category:'building',author:'TrussLab procedural',license:'CC0 / original',width:32,length:24,floors:8},
 {id:'warehouse',name:'Склад',category:'building',author:'TrussLab procedural',license:'CC0 / original',width:46,length:26,floors:1},
 {id:'school',name:'Школа',category:'building',author:'TrussLab procedural',license:'CC0 / original',width:40,length:25,floors:3},
+{id:'shop',name:'Магазин',category:'building',author:'TrussLab procedural',license:'CC0 / original',width:22,length:16,floors:1},
+{id:'clinic',name:'Поликлиника',category:'building',author:'TrussLab procedural',license:'CC0 / original',width:30,length:20,floors:2},
 {id:'station',name:'Железнодорожная станция',category:'infrastructure',author:'TrussLab procedural',license:'CC0 / original',width:44,length:16,floors:2},
 {id:'lamp',name:'Фонарь',category:'infrastructure',author:'TrussLab procedural',license:'CC0 / original',width:2,length:2,floors:1},
 {id:'substation',name:'Подстанция',category:'infrastructure',author:'TrussLab procedural',license:'CC0 / original',width:16,length:12,floors:1},
@@ -68,7 +70,7 @@ class WorldEditorCore{
   const model=this.catalog.find(o=>o.id===catalogId);if(!model)return {ok:false,reason:'Неизвестная модель'};
   const zones=this.objects.filter(o=>o.type==='parcel');if(!zones.length)return {ok:true,reason:'Свободная учебная зона; зонирование не задано'};
   const available=zones.filter(o=>pointIn([x,z],o.points));if(!available.length)return {ok:false,reason:'За границами выделенных земельных зон'};
-  const suitable=available.some(zone=>zone.zoning==='park'?['lamp'].includes(catalogId):zone.zoning==='industrial'?['warehouse','substation','station','lamp','office','bridge-pier'].includes(catalogId):zone.zoning==='commercial'?['office','station','school','lamp','house','apartment'].includes(catalogId):['house','apartment','school','lamp','office'].includes(catalogId));
+  const suitable=available.some(zone=>zone.zoning==='park'?['lamp'].includes(catalogId):zone.zoning==='industrial'?['warehouse','substation','station','lamp','office','bridge-pier'].includes(catalogId):zone.zoning==='commercial'?['office','station','school','clinic','shop','lamp','house','apartment'].includes(catalogId):['house','apartment','school','clinic','shop','lamp','office'].includes(catalogId));
   return {ok:suitable,reason:suitable?'Модель соответствует зонированию':'Тип модели не соответствует разрешённому использованию'};
  }
  utilityReport(tolerance=4){

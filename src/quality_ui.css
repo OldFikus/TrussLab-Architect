@@ -1,0 +1,14 @@
+/* Quality restoration: local UI inside regional 3D HUD */
+#quality-lab-panel{position:absolute;left:12px;bottom:15px;z-index:24;max-width:min(350px,calc(100% - 24px));background:#0b2631e8;color:#e4f2f0;padding:10px 12px;border:1px solid #56808a;border-radius:11px;box-shadow:0 8px 28px #09172199;font:12px/1.45 system-ui,sans-serif;backdrop-filter:blur(8px)}
+#quality-lab-panel[hidden]{display:none!important}#quality-lab-panel *{box-sizing:border-box}#quality-lab-panel button,#quality-lab-panel select{font:inherit;border:1px solid #547e88;background:#183a49;color:#ecf3f2;border-radius:7px;padding:6px 8px;cursor:pointer}
+#quality-lab-panel select{width:100%;min-height:32px;margin:6px 0}#quality-lab-panel label{font-size:11px;color:#c7dadd;display:block}#quality-lab-panel label input{accent-color:#e7c894;vertical-align:middle}#quality-lab-panel header{display:flex;gap:8px;justify-content:space-between;align-items:center;font-weight:700;color:#f6dba5}#quality-lab-panel header button{min-height:25px;padding:2px 8px}#quality-lab-panel .q-status{font-size:10px;color:#c9e1e1;white-space:pre-wrap;margin-top:5px}#quality-lab-panel .q-row{display:flex;gap:8px;flex-wrap:wrap;margin:5px 0}#quality-lab-panel .q-row label{white-space:nowrap}
+#quality-lab-open{background:#284957;color:#e7e1cf;border:1px solid #829fa4;border-radius:9px;padding:8px 10px;font-weight:700;cursor:pointer}
+#quality-lab-panel.collapsed>div{display:none}#quality-lab-panel.collapsed{bottom:15px}
+@media(max-width:650px){#quality-lab-panel{left:5px;right:5px;bottom:8px;max-width:none;padding:8px}#quality-lab-panel .q-row{gap:5px}}
+
+/* Fidelity: keep the larger panel usable on short/mobile viewports. */
+#quality-lab-panel{max-height:calc(100% - 28px);overflow-y:auto;overscroll-behavior:contain}
+#quality-lab-panel .q-fidelity{display:grid;gap:3px;margin:6px 0;padding:8px;border:1px solid #3a636e;border-radius:9px;background:#102e3b}
+#quality-lab-panel .q-fidelity>label:has(input[type=checkbox]){display:flex;gap:7px;align-items:center;margin:3px 0}
+@media(max-width:650px){#quality-lab-panel{max-height:calc(100% - 16px)}}
+
