@@ -477,11 +477,11 @@ class RegionTileStore{
  constructor({limit=96,parallel=3,maxBytes=4_000_000}={}){
   this.limit=limit;this.parallel=parallel;this.maxBytes=maxBytes;this.index=null;
   this.files=new Map();this.baseURL=null;this.inline=new Map();this.cache=new Map();this.pending=new Set();this.queue=[];
-  this.loaded=0;this.failures=0;this.failedKeys=new Set();this.mode='none';this.onUpdate=()=>{};
+  this.loaded=0;this.failures=0;this.failedKeys=new Set();this.partialKeys=new Set();this.mode='none';this.onUpdate=()=>{};
  }
  setManifest(raw,{files=null,baseURL=null,inline=null,mode='files'}={}){
   this.index=validateRegionIndex(raw);this.files=files||new Map();this.baseURL=baseURL;
-  this.inline=inline||new Map();this.mode=mode;this.queue=[];this.pending.clear();for(const fc of this.cache.values())fc.raster?.close();this.cache.clear();this.loaded=0;this.failures=0;this.failedKeys.clear();
+  this.inline=inline||new Map();this.mode=mode;this.queue=[];this.pending.clear();for(const fc of this.cache.values())fc.raster?.close();this.cache.clear();this.loaded=0;this.failures=0;this.failedKeys.clear();this.partialKeys.clear();
   this.epoch=(this.epoch||0)+1;
   if(this.index.region)window.dispatchEvent(new CustomEvent('planet-region-loaded',{detail:{raw,options:{files,baseURL,inline,mode}}}));
   this.onUpdate();return this.index;
@@ -499,7 +499,7 @@ class RegionTileStore{
   const raw=await res.json();const baseURL=new URL('.',url).href;
   return this.setManifest(raw,{baseURL,mode:'http'});
  }
- stats(){return {indexed:this.index?.tiles.size||0,cached:this.cache.size,loaded:this.loaded,pending:this.pending.size,queued:this.queue.length,failures:this.failures,mode:this.mode};}
+ stats(){return {indexed:this.index?.tiles.size||0,cached:this.cache.size,loaded:this.loaded,pending:this.pending.size,queued:this.queue.length,failures:this.failures,partial:this.partialKeys.size,mode:this.mode};}
  get(key){const item=this.cache.get(key);if(item){this.cache.delete(key);this.cache.set(key,item);}return item||null;}
  _evict(){while(this.cache.size>this.limit){const oldest=this.cache.keys().next().value;this.cache.get(oldest)?.raster?.close();this.cache.delete(oldest)}}
  _pull(){
@@ -509,7 +509,7 @@ class RegionTileStore{
    this.pending.add(key);const epoch=this.epoch;
    this._load(key).then(fc=>{
     if(this.epoch!==epoch){fc.raster?.close();return;}
-    this.cache.set(key,fc);this.loaded++;this._evict();
+    this.cache.set(key,fc);if(fc.missing?.length)this.partialKeys.add(key);this.loaded++;this._evict();
    }).catch(err=>{
     if(this.epoch!==epoch)return;
     this.failures++;this.failedKeys.add(key);this.lastError=String(err?.message||err).slice(0,160);
@@ -522,16 +522,31 @@ class RegionTileStore{
  async _load(key){
   const source=this.index.tiles.get(key),path=source?.path;
   const rasterFile=this.files.get(source?.raster),baseURL=this.baseURL;
-  const fc=path?await this._loadVector(path):{type:'FeatureCollection',features:[]};
-  if(source?.raster){
+  const tasks=[];
+  if(path)tasks.push(['vector',this._loadVector(path)]);
+  if(source?.raster)tasks.push(['raster',this._loadRaster(source.raster,rasterFile,baseURL)]);
+  const results=await Promise.allSettled(tasks.map(task=>task[1]));
+  const fc={type:'FeatureCollection',features:[],missing:[]};
+  results.forEach((result,i)=>{
+   const layer=tasks[i][0];
+   if(result.status==='rejected'){fc.missing.push(layer);return;}
+   if(layer==='vector')fc.features=result.value.features;
+   else fc.raster=result.value;
+  });
+  if(fc.missing.length===tasks.length)throw Error('Нет данных: '+key);
+  return fc;
+ }
+ retryMissing(){
+  for(const key of this.partialKeys){this.cache.get(key)?.raster?.close();this.cache.delete(key);}
+  this.partialKeys.clear();this.failedKeys.clear();this.failures=0;this.onUpdate();
+ }
+ async _loadRaster(path,rasterFile,baseURL){
    let blob=rasterFile;
-   if(!blob && baseURL){const response=await fetch(new URL(source.raster,baseURL));if(response.ok)blob=await response.blob();}
-   if(!blob || blob.size>512000)throw Error('Растр недоступен: '+source.raster);
+   if(!blob && baseURL){const response=await fetch(new URL(path,baseURL));if(response.ok)blob=await response.blob();}
+   if(!blob || blob.size>512000)throw Error('Растр недоступен: '+path);
    const header=new DataView(await blob.slice(0,24).arrayBuffer());
    if(header.byteLength!==24 || header.getUint32(0)!==0x89504e47 || header.getUint32(16)!==256 || header.getUint32(20)!==256)throw Error('Требуется PNG 256×256');
-   fc.raster=await createImageBitmap(blob);
-  }
-  return fc;
+   return createImageBitmap(blob);
  }
  async _loadVector(path){
   let content;
@@ -763,7 +778,7 @@ class RegionAtlas{
   const line=`${this.store.mode==='none'?'Нет регионального набора':this.store.mode} · ${stats.cached}/${stats.indexed} в кэше · на экране ${paintedTiles} тайлов, ${shapes} объектов · центр ${place.lat.toFixed(4)}°, ${place.lon.toFixed(4)}°`;
   const region=this.store.index?.region;
   const credit=region?region.name+' · '+region.source.quality+' · '+region.source.attribution+' · '+region.source.license+Object.entries(region.layers).map(([k,v])=>' · '+(k==='raster'?'Растр':'Вектор')+' — '+v.attribution+' / '+v.license).join('')+' | ':'';
-  if(this.status)this.status.textContent=credit+(this.tooFar?'Обзор покрытия пакета · ячейки показывают число тайлов. Приблизьте карту для просмотра объектов.':this.error&&stats.mode==='none'?this.error:line+(stats.failures?' · ошибок загрузки: '+stats.failures:''));
+  if(this.status)this.status.textContent=credit+(this.tooFar?'Обзор покрытия пакета · ячейки показывают число тайлов. Приблизьте карту для просмотра объектов.':this.error&&stats.mode==='none'?this.error:line+(stats.failures?' · тайлов без данных: '+stats.failures:'')+(stats.partial?' · неполных тайлов: '+stats.partial:''));
   const scaleEl=document.getElementById('atlas-scale');if(scaleEl)scaleEl.textContent=`${(120/this.scale/1000).toFixed(2)} км / 120 px (проекционная шкала)`;
  }
  setDemo(){

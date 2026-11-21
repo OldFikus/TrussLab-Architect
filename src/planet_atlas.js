@@ -3,6 +3,8 @@
   const button=document.createElement('button');
   button.id='planet-atlas';button.textContent='Глобальный атлас';
   document.getElementById('atlas-files').before(button);
+  const retry=document.createElement('button');retry.type='button';retry.id='planet-retry';retry.textContent='Повторить загрузку';
+  button.after(retry);retry.onclick=()=>atlas.store.retryMissing();
   const dialog=document.createElement('dialog');dialog.setAttribute('aria-label','Глобальный атлас');
   dialog.style.cssText='width:min(92vw,800px);background:#132c38;color:#e9f8fa;border:1px solid #699190';
   dialog.innerHTML='<h2>Глобальный атлас</h2><canvas aria-label="Покрытие установленных регионов" width="720" height="360" style="width:100%;height:auto"></canvas><label>Регион <select></select></label> <div data-credits></div><button data-open>Открыть регион</button> <button data-close>Закрыть</button>';

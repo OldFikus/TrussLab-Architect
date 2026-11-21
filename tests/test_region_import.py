@@ -47,4 +47,13 @@ with tempfile.TemporaryDirectory() as tmp:
         page.wait_for_function("document.querySelector('dialog[open] output').textContent.includes('загрузок 3')")
         assert page.evaluate("document.querySelector('dialog[open] canvas').getContext('webgl').getError()")==0
         page.locator('dialog[open] button').click()
+        (root/'demo/tiles/0_0.png').unlink()
+        (root/'demo/tiles/1_0.geojson').unlink()
+        (root/'demo/tiles/2_0.geojson').unlink()
+        page.locator('#atlas-file-picker').set_input_files(root/'demo')
+        page.wait_for_function("atlas.store.partialKeys.size===2 && atlas.store.failures===1")
+        assert page.evaluate("atlas.store.get('0:0').features.length") == 12
+        assert page.evaluate("atlas.store.get('1:0').raster.height") == 256
+        page.locator('#planet-retry').click()
+        page.wait_for_function("atlas.store.partialKeys.size===2 && atlas.store.failures===1")
         browser.close()
