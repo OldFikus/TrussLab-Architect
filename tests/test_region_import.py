@@ -25,6 +25,9 @@ with tempfile.TemporaryDirectory() as tmp:
     with rasterio.open(root/'map.tif','w',driver='COG',width=512,height=256,count=1,dtype='uint8',crs='EPSG:3857',transform=from_origin(0,2048,8,8)) as dst:
         dst.write(np.full((1,256,512),150,dtype=np.uint8))
     args=[sys.executable,str(ROOT/'tools/import_region.py'),'--output',str(root/'demo'),'--name','Import test','--license-name','CC0','--attribution','TrussLab','--quality','demo','--parquet',str(root/'streets.parquet'),'--cog',str(root/'map.tif')]
+    credits=root/'rights.json'
+    credits.write_text(json.dumps({'raster':dict(attribution='Colour studio',license='CC0-1.0',quality='demo')}))
+    args+=['--layer-credits',str(credits)]
     subprocess.run(args,check=True)
     manifest=json.loads((root/'demo/index.json').read_text())
     tiles=manifest['index']['tiles']
@@ -38,6 +41,7 @@ with tempfile.TemporaryDirectory() as tmp:
         page.locator('#atlas-open').click()
         page.locator('#atlas-file-picker').set_input_files(root/'demo')
         page.wait_for_function("atlas.store.loaded===3 && atlas.stats.shapes===36")
+        assert 'Colour studio' in page.locator('#atlas-status').inner_text()
         assert page.evaluate("atlas.store.get('1:0').raster.width") == 256
         page.locator('#planet-3d').click()
         page.wait_for_function("document.querySelector('dialog[open] output').textContent.includes('загрузок 3')")

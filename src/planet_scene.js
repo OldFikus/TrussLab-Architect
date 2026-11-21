@@ -111,7 +111,7 @@
       gl.uniform1i(vertex.raster,entry.raster);gl.uniform1i(vertex.ground,1);gl.drawArrays(gl.TRIANGLES,0,6);
       gl.uniform1i(vertex.ground,0);gl.drawArrays(gl.TRIANGLES,6,entry.count-6);triangles+=entry.count/3;
     }
-    status.textContent=triangles+' △ · '+(bytes/1048576).toFixed(2)+' / 24 МиБ мешей и текстур · '+'загрузок '+loads+' · ошибок '+atlas.store.failures;
+    status.textContent=triangles+' △ · '+(bytes/1048576).toFixed(2)+' / 24 МиБ мешей и текстур · '+'загрузок '+loads+' · ошибок '+atlas.store.failures+' · '+(atlas.store.index?.metadata?.sources||[]).join(' / ');
     if(uploaded||atlas.store.pending.size||atlas.store.queue.length)queue();
   }
   function queue(){if(!frame)frame=requestAnimationFrame(render);}

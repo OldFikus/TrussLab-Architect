@@ -94,7 +94,7 @@ def rasters(path, target):
                 yield x,y,filename
 
 
-def compile_region(output, name, attribution, license_name, quality, parquet=None, cog=None):
+def compile_region(output, name, attribution, license_name, quality, parquet=None, cog=None, layer_credits=None):
     import re
     output = Path(output).resolve()
     if not parquet and not cog: raise ValueError('Choose a GeoParquet or COG input')
@@ -136,6 +136,13 @@ def compile_region(output, name, attribution, license_name, quality, parquet=Non
                       bounds=[west,south,east,north],center=[(west+east)/2,(south+north)/2],
                       source=dict(attribution=attribution,license=license_name,quality=quality),
                       index=dict(type='TrussLabRegionIndex',version=1,projection='EPSG:3857',tileSizeMeters=SIZE,tiles=tiles))
+        if layer_credits:
+            layers=json.loads(Path(layer_credits).read_text())
+            if not isinstance(layers,dict): raise ValueError('Expected layer rights object')
+            for layer,credit in layers.items():
+                if layer not in ('vector','raster') or not isinstance(credit,dict) or not all(isinstance(credit.get(k),str) and credit[k].strip() and len(credit[k])<=512 for k in ('attribution','license')) or credit.get('quality') not in ('confirmed','approximate','demo','missing'):
+                    raise ValueError('Invalid layer rights')
+            manifest['layers']=layers
         (target/'index.json').write_text(json.dumps(manifest,ensure_ascii=False),encoding='utf8')
         if output.exists(): raise FileExistsError(output)
         target.rename(output)
@@ -146,6 +153,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     for key in ('output','name','attribution','license_name','quality'):
         parser.add_argument('--'+key.replace('_','-'),dest=key,required=True)
+    parser.add_argument('--layer-credits',help='JSON object with vector and raster source records')
     parser.add_argument('--parquet')
     parser.add_argument('--cog')
     with ProcessPoolExecutor(max_workers=1) as pool:

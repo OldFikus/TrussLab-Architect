@@ -5,7 +5,7 @@
   document.getElementById('atlas-files').before(button);
   const dialog=document.createElement('dialog');dialog.setAttribute('aria-label','Глобальный атлас');
   dialog.style.cssText='width:min(92vw,800px);background:#132c38;color:#e9f8fa;border:1px solid #699190';
-  dialog.innerHTML='<h2>Глобальный атлас</h2><canvas aria-label="Покрытие установленных регионов" width="720" height="360" style="width:100%;height:auto"></canvas><label>Регион <select></select></label> <button data-open>Открыть регион</button> <button data-close>Закрыть</button>';
+  dialog.innerHTML='<h2>Глобальный атлас</h2><canvas aria-label="Покрытие установленных регионов" width="720" height="360" style="width:100%;height:auto"></canvas><label>Регион <select></select></label> <div data-credits></div><button data-open>Открыть регион</button> <button data-close>Закрыть</button>';
   document.body.append(dialog);
   const canvas=dialog.querySelector('canvas'),select=dialog.querySelector('select');
   const demo=null /* {{ PLANET_DEMO }} */;
@@ -18,6 +18,12 @@
   window.addEventListener('planet-region-loaded',e=>register(e.detail.raw,e.detail.options));
   const xy=([lon,lat])=>[(180+lon)*2,(90-lat)*2];
   function paint(){
+    const raw=entries.get(select.value)?.raw,credits=dialog.querySelector('[data-credits]');
+    credits.replaceChildren();
+    if(raw)for(const [label,source] of Object.entries({Пакет:raw.source,Вектор:raw.layers?.vector,Растр:raw.layers?.raster})){
+      if(!source)continue;
+      const line=document.createElement('p');line.textContent=label+' · '+source.attribution+' · '+source.license+' · '+source.quality;credits.append(line);
+    }
     const ctx=canvas.getContext('2d');ctx.fillStyle='#0c2532';ctx.fillRect(0,0,720,360);
     ctx.strokeStyle='#395562';ctx.fillStyle='#aac4c6';ctx.font='12px system-ui';
     for(let lon=-180;lon<180;lon+=30){const x=(lon+180)*2;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,360);ctx.stroke();ctx.fillText(lon+'°',x+4,18);}

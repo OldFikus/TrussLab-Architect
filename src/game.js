@@ -762,7 +762,7 @@ class RegionAtlas{
   const stats=this.store.stats(),place=mercatorUnproject(this.center.x,this.center.y);
   const line=`${this.store.mode==='none'?'Нет регионального набора':this.store.mode} · ${stats.cached}/${stats.indexed} в кэше · на экране ${paintedTiles} тайлов, ${shapes} объектов · центр ${place.lat.toFixed(4)}°, ${place.lon.toFixed(4)}°`;
   const region=this.store.index?.region;
-  const credit=region?region.name+' · '+region.source.quality+' · '+region.source.attribution+' · '+region.source.license+' | ':'';
+  const credit=region?region.name+' · '+region.source.quality+' · '+region.source.attribution+' · '+region.source.license+Object.entries(region.layers).map(([k,v])=>' · '+(k==='raster'?'Растр':'Вектор')+' — '+v.attribution+' / '+v.license).join('')+' | ':'';
   if(this.status)this.status.textContent=credit+(this.tooFar?'Обзор покрытия пакета · ячейки показывают число тайлов. Приблизьте карту для просмотра объектов.':this.error&&stats.mode==='none'?this.error:line+(stats.failures?' · ошибок загрузки: '+stats.failures:''));
   const scaleEl=document.getElementById('atlas-scale');if(scaleEl)scaleEl.textContent=`${(120/this.scale/1000).toFixed(2)} км / 120 px (проекционная шкала)`;
  }

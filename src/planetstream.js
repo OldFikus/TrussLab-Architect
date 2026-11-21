@@ -15,13 +15,16 @@ function unpackPlanetRegion(raw) {
   if (!Array.isArray(center) || center.length !== 2 || !center.every(Number.isFinite) ||
       center[0] < west || center[0] > east || center[1] < south || center[1] > north)
     throw Error('Центр вне границ региона');
-  if (!source || !['attribution','license'].every(key =>
-      typeof source[key] === 'string' && source[key].trim() && source[key].length <= 512) ||
-      !['confirmed','approximate','demo','missing'].includes(source.quality))
-    throw Error('Укажите источник, права и достоверность');
+  const validSource=s=>s && ['attribution','license'].every(key=>
+    typeof s[key]==='string' && s[key].trim() && s[key].length<=512) &&
+    ['confirmed','approximate','demo','missing'].includes(s.quality);
+  if(!validSource(source))throw Error('Укажите источник, права и достоверность');
+  const layers=raw.layers??{};
+  if(typeof layers!=='object'||Array.isArray(layers)||Object.entries(layers).some(([k,v])=>
+    !['raster','vector'].includes(k)||!validSource(v)))throw Error('Неверное описание источника слоя');
   if (raw.index?.type !== 'TrussLabRegionIndex') throw Error('Отсутствует индекс тайлов');
-  return {...raw.index, metadata:{...raw.index.metadata, region:{id,name,bounds,center,source},
-    sources:[source.attribution + ' · ' + source.license]}};
+  return {...raw.index, metadata:{...raw.index.metadata, region:{id,name,bounds,center,source,layers},
+    sources:[source,...Object.values(layers)].map(s=>s.attribution+' · '+s.license)}};
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = {unpackPlanetRegion};
 
