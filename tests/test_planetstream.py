@@ -15,6 +15,9 @@ with sync_playwright() as pw:
     for profile in ('SAFE','LAB'):
         page.goto((ROOT/'dist'/f'TrussLab_{VERSION}_{profile}.html').as_uri())
         page.locator('#atlas-open').click()
+        page.locator('#planet-atlas').click()
+        page.locator('dialog[open] [data-open]').click()
+        page.wait_for_function("atlas.store.loaded===1 && atlas.store.mode==='Демо'")
         page.locator('#atlas-file-picker').set_input_files(ROOT/'examples/region')
         page.wait_for_function("atlas.store.loaded === 1 && atlas.stats.shapes === 1")
         assert 'CC0-1.0' in page.locator('#atlas-status').inner_text()

@@ -1,16 +1,17 @@
 """Build offline PlanetStream from the editable GPU Clarity SAFE modules."""
 from pathlib import Path
 import hashlib
+import json
 from zipfile import ZipFile, ZIP_DEFLATED
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'src'
 DIST = ROOT / 'dist'
-VERSION = '17.4'
+VERSION = '17.5'
 GROUPS = {
     'STYLES': 'style.css worldeditor.css infrastructure.css citysim_plus.css world_visual.css nature.css quality_ui.css',
     'SCRIPT': 'planetstream.js rendercore/materials.js rendercore/capabilities.js game.js worldeditor_core.js worldeditor_ui.js worldeditor_region3d.js infrastructure_core.js infrastructure_ui.js',
-    'EXTENSIONS': 'citysim_plus.js citysim_plus_ui.js world_visual_core.js world_visual_ui.js nature_core.js nature_ui.js quality_ui.js planet_scene.js',
+    'EXTENSIONS': 'citysim_plus.js citysim_plus_ui.js world_visual_core.js world_visual_ui.js nature_core.js nature_ui.js quality_ui.js planet_scene.js planet_atlas.js',
 }
 
 def build():
@@ -20,6 +21,10 @@ def build():
         marker = '/* {{ ' + group + ' }} */'
         assert html.count(marker) == 1
         html = html.replace(marker, '\n'.join((SRC / n).read_text() for n in names.split()))
+    region=ROOT/'examples'/'region'
+    demo={'manifest':json.loads((region/'index.json').read_text()),'files':{
+        p.relative_to(region).as_posix():json.loads(p.read_text()) for p in (region/'tiles').glob('*.geojson')}}
+    html=html.replace('null /* {{ PLANET_DEMO }} */',json.dumps(demo,ensure_ascii=False).replace('<',r'\u003c'))
     for profile in ('SAFE', 'LAB'):
         page = html
         if profile == 'LAB':

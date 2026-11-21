@@ -482,7 +482,9 @@ class RegionTileStore{
  setManifest(raw,{files=null,baseURL=null,inline=null,mode='files'}={}){
   this.index=validateRegionIndex(raw);this.files=files||new Map();this.baseURL=baseURL;
   this.inline=inline||new Map();this.mode=mode;this.queue=[];this.pending.clear();for(const fc of this.cache.values())fc.raster?.close();this.cache.clear();this.loaded=0;this.failures=0;this.failedKeys.clear();
-  this.epoch=(this.epoch||0)+1;this.onUpdate();return this.index;
+  this.epoch=(this.epoch||0)+1;
+  if(this.index.region)window.dispatchEvent(new CustomEvent('planet-region-loaded',{detail:{raw,options:{files,baseURL,inline,mode}}}));
+  this.onUpdate();return this.index;
  }
  async openDirectory(fileList){
   const files=normalizeRegionFiles(fileList),manifest=files.get('index.json');
