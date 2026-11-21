@@ -28,3 +28,17 @@ function inspectTransport(graph) {
   return {length,components,invalid,duplicates,edges:graph.edges.length};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports.inspectTransport=inspectTransport;
+
+function neutralFootprints(items) {
+  const features=[];
+  for(const {f} of items){
+    const g=f?.geometry,p=f?.properties||{};
+    if(!g||!['Polygon','MultiPolygon'].includes(g.type))continue;
+    const type=p.building?'building':p.landuse||p.place==='neighbourhood'?'block':null;
+    if(!type)continue;
+    const geometry={type:g.type,coordinates:g.coordinates};
+    features.push({type:'Feature',geometry,properties:{kind:type}});
+  }
+  return {type:'FeatureCollection',features};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports.neutralFootprints=neutralFootprints;

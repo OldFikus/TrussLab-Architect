@@ -27,6 +27,12 @@
     }
     paint();dialog.showModal();
   };
+  const neutral=document.createElement('button');neutral.textContent='Скачать нейтральные контуры';details.after(neutral);
+  neutral.onclick=()=>{
+    const collection=neutralFootprints(records);collection.metadata={sources:atlas.store.index?.metadata?.sources||[],scope:'visible selection; geometry only'};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(collection)],{type:'application/geo+json'}));
+    const a=document.createElement('a');a.href=url;a.download='footprints.geojson';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
   select.onchange=paint;
   dialog.querySelector('[data-close]').onclick=()=>dialog.close();
 })();

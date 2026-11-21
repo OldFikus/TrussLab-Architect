@@ -13,3 +13,9 @@ const nodes=[{id:0,x:0,z:0},{id:1,x:10,z:0},{id:2,x:20,z:0}];
 const valid={from:1,to:0,length:10,oneWay:true};
 assert.deepEqual(inspectTransport({nodes,edges:[valid,valid,{from:0,to:9,length:10}]}),
   {length:20,components:2,invalid:1,duplicates:1,edges:3});
+const {neutralFootprints}=require('../src/fidelity');
+const polygon={type:'Polygon',coordinates:[[[0,0],[1,0],[0,1],[0,0]]]};
+const neutral=neutralFootprints([{f:{geometry:polygon,properties:{building:'yes',owner:'private',parcel_id:123}}},
+  {f:{geometry:polygon,properties:{landuse:'residential'}}}]);
+assert.deepEqual(neutral.features.map(f=>f.properties),[{kind:'building'},{kind:'block'}]);
+assert.deepEqual(neutral.features[0].geometry,polygon);
