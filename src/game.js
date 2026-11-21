@@ -461,7 +461,7 @@ function validateRegionIndex(raw){
   if(!Number.isInteger(val.features)||val.features<0||val.features>200000)throw Error('Некорректное число объектов');
   tiles.set(key,{path:val.path,raster:val.raster,features:val.features});
  }
- return {size,tiles,region:planet?raw.metadata.region:null,metadata:raw.metadata||{},report:raw.report||{}};
+ return {size,tiles,coverage:new PlanetCoverage(tiles),region:planet?raw.metadata.region:null,metadata:raw.metadata||{},report:raw.report||{}};
 }
 function normalizeRegionFiles(files){
  const map=new Map();
@@ -716,6 +716,14 @@ class RegionAtlas{
   const topLeft=this.screenToWorld(0,0),rightBottom=this.screenToWorld(w,h);
   ctx.lineWidth=1;ctx.strokeStyle=light?'#324f5860':'#cce8e82d';ctx.font='10px system-ui';ctx.fillStyle=light?'#34505a':'#a9c8d0';
   const x0=Math.floor(topLeft.x/tileSize),x1=Math.floor(rightBottom.x/tileSize),y0=Math.floor(rightBottom.y/tileSize),y1=Math.floor(topLeft.y/tileSize);
+  if(this.tooFar && this.store.index?.coverage){
+   for(const cell of this.store.index.coverage.query(x0,y0,x1,y1)){
+    const [left,top]=this.worldToScreen(cell.x*tileSize,(cell.y+cell.span)*tileSize);
+    const width=cell.span*tileSize*this.scale;
+    ctx.fillStyle=light?'#21847b65':'#68d9ca55';ctx.fillRect(left,top,width,width);
+    if(width>40){ctx.fillStyle=light?'#184941':'#d7fff9';ctx.fillText(cell.tiles+' т.',left+4,top+14);}
+   }
+  }
   if((x1-x0+1)*(y1-y0+1)<600){
    ctx.beginPath();for(let x=x0;x<=x1;x++){const [px]=this.worldToScreen(x*tileSize,0);ctx.moveTo(px,0);ctx.lineTo(px,h)}
    for(let y=y0;y<=y1;y++){const [,py]=this.worldToScreen(0,y*tileSize);ctx.moveTo(0,py);ctx.lineTo(w,py)}ctx.stroke();
@@ -753,7 +761,7 @@ class RegionAtlas{
   const line=`${this.store.mode==='none'?'Нет регионального набора':this.store.mode} · ${stats.cached}/${stats.indexed} в кэше · на экране ${paintedTiles} тайлов, ${shapes} объектов · центр ${place.lat.toFixed(4)}°, ${place.lon.toFixed(4)}°`;
   const region=this.store.index?.region;
   const credit=region?region.name+' · '+region.source.quality+' · '+region.source.attribution+' · '+region.source.license+' | ':'';
-  if(this.status)this.status.textContent=credit+(this.tooFar?'Слишком большой обзор для загрузки тайлов: увеличь масштаб. Крым показан только схематично.':this.error&&stats.mode==='none'?this.error:line+(stats.failures?' · ошибок загрузки: '+stats.failures:''));
+  if(this.status)this.status.textContent=credit+(this.tooFar?'Обзор покрытия пакета · ячейки показывают число тайлов. Приблизьте карту для просмотра объектов.':this.error&&stats.mode==='none'?this.error:line+(stats.failures?' · ошибок загрузки: '+stats.failures:''));
   const scaleEl=document.getElementById('atlas-scale');if(scaleEl)scaleEl.textContent=`${(120/this.scale/1000).toFixed(2)} км / 120 px (проекционная шкала)`;
  }
  setDemo(){
@@ -1810,7 +1818,7 @@ class Region3D{
   for(const [key,value] of map){if(map.size<=maxEntries)break;if(keep.has(key))continue;if(this.gl&&value.buffer)this.gl.deleteBuffer(value.buffer);this.webgpu?.release(value);map.delete(key);}
  }
  _stream(){
-  if((this.store.epoch||0)!==this.storeEpoch){for(const item of this.cityCache.values())if(this.gl&&item?.buffer)this.gl.deleteBuffer(item.buffer);this.webgpu?.release(item);this.cityCache.clear();this.storeEpoch=this.store.epoch||0;}
+  if((this.store.epoch||0)!==this.storeEpoch){for(const item of this.cityCache.values()){if(this.gl&&item?.buffer)this.gl.deleteBuffer(item.buffer);this.webgpu?.release(item);}this.cityCache.clear();this.storeEpoch=this.store.epoch||0;}
   const terrainQuality=this._effectiveQuality(),range=this._profile().terrainRange;
   const plan=visibleTerrainPlan(this.cam.x,this.cam.z,{quality:terrainQuality,range});
   // Prioritize visible tiles during the first seconds of exploration; remaining

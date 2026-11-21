@@ -6,7 +6,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'src'
 DIST = ROOT / 'dist'
-VERSION = '17.2'
+VERSION = '17.3'
 GROUPS = {
     'STYLES': 'style.css worldeditor.css infrastructure.css citysim_plus.css world_visual.css nature.css quality_ui.css',
     'SCRIPT': 'planetstream.js rendercore/materials.js rendercore/capabilities.js game.js worldeditor_core.js worldeditor_ui.js worldeditor_region3d.js infrastructure_core.js infrastructure_ui.js',

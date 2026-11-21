@@ -24,3 +24,41 @@ function unpackPlanetRegion(raw) {
     sources:[source.attribution + ' · ' + source.license]}};
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = {unpackPlanetRegion};
+
+/* Sparse pyramid. Every occupied cell contributes its feature count to its ancestors. */
+class PlanetCoverage {
+  constructor(tiles) {
+    this.levels = [];
+    let cells = tiles;
+    while (cells.size && this.levels.length < 24) {
+      const next = new Map();
+      for (const [key, item] of cells) {
+        const [x,y] = key.split(':').map(Number);
+        const parent = Math.floor(x/2) + ':' + Math.floor(y/2);
+        const current = next.get(parent) || {features:0, tiles:0};
+        current.features += item.features;
+        current.tiles += item.tiles ?? 1;
+        next.set(parent,current);
+      }
+      this.levels.push(next);
+      if ([...next.keys()].every(k => /^(-1|0):(-1|0)$/.test(k))) break;
+      cells = next;
+    }
+  }
+  query(x0,y0,x1,y1) {
+    let span=1, level=0;
+    do {span *= 2; level++;}
+    while ((Math.floor(x1/span)-Math.floor(x0/span)+1)*(Math.floor(y1/span)-Math.floor(y0/span)+1)>96 && level<this.levels.length);
+    const cells=this.levels[level-1], result=[];
+    if (!cells) return result;
+    const left=Math.floor(x0/span),right=Math.floor(x1/span),bottom=Math.floor(y0/span),top=Math.floor(y1/span);
+    const add=(x,y,cell)=>{if(cell)result.push({x:x*span,y:y*span,span,...cell});};
+    if ((right-left+1)*(top-bottom+1)>cells.size) {
+      for(const [key,value] of cells){const [x,y]=key.split(':').map(Number);if(x>=left&&x<=right&&y>=bottom&&y<=top)add(x,y,value);}
+    } else {
+      for(let x=left;x<=right;x++)for(let y=bottom;y<=top;y++)add(x,y,cells.get(x+':'+y));
+    }
+    return result;
+  }
+}
+if (typeof module !== 'undefined' && module.exports) module.exports.PlanetCoverage=PlanetCoverage;
