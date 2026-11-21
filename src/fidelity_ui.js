@@ -30,3 +30,17 @@
   select.onchange=paint;
   dialog.querySelector('[data-close]').onclick=()=>dialog.close();
 })();
+
+(() => {
+  const section=document.createElement('section');section.innerHTML='<h3>Транспорт проекта</h3><button>Проверить дороги и пути</button><p role="status"></p>';
+  document.getElementById('fidelity-dialog').append(section);
+  section.querySelector('button').onclick=()=>{
+    const sim=globalThis.trusslabInfraSim,out=section.querySelector('p');
+    try{
+      sim.rebuild();
+      out.textContent=[['Автодороги',sim.road],['Железная дорога',sim.rail]].map(([label,graph])=>{
+        const r=inspectTransport(graph);return label+' — '+(r.edges?r.edges+' участков, '+r.length.toFixed(0)+' м, связных групп '+r.components+', дубликатов '+r.duplicates+', некорректных рёбер '+r.invalid:'нет данных');
+      }).join(' | ');
+    }catch(error){out.textContent=error.message;}
+  };
+})();
