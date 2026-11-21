@@ -39,4 +39,8 @@ with tempfile.TemporaryDirectory() as tmp:
         page.locator('#atlas-file-picker').set_input_files(root/'demo')
         page.wait_for_function("atlas.store.loaded===3 && atlas.stats.shapes===36")
         assert page.evaluate("atlas.store.get('1:0').raster.width") == 256
+        page.locator('#planet-3d').click()
+        page.wait_for_function("document.querySelector('dialog[open] output').textContent.includes('загрузок 3')")
+        assert page.evaluate("document.querySelector('dialog[open] canvas').getContext('webgl').getError()")==0
+        page.locator('dialog[open] button').click()
         browser.close()
