@@ -19,3 +19,11 @@ const neutral=neutralFootprints([{f:{geometry:polygon,properties:{building:'yes'
   {f:{geometry:polygon,properties:{landuse:'residential'}}}]);
 assert.deepEqual(neutral.features.map(f=>f.properties),[{kind:'building'},{kind:'block'}]);
 assert.deepEqual(neutral.features[0].geometry,polygon);
+const historic={properties:{fidelity:{history:[
+  {kind:'gis',date:'2011-04-01',state:'фундамент'},
+  {kind:'photo',date:'2013-02-29',state:'ошибка даты'},
+  {kind:'scan',date:'2020-01-01',state:'реконструкция'}
+]}}};
+assert.equal(fidelityRecord(historic,null,'2014-01-01').state,'фундамент');
+assert.equal(fidelityRecord(historic,null,'2009-01-01').quality,'missing');
+assert.equal(fidelityRecord(historic,null).kind,'scan');

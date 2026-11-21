@@ -1,11 +1,21 @@
 const FIDELITY_KINDS=Object.freeze({gis:'GIS',photo:'Фотография',scan:'Скан',model:'Модель',fiction:'Вымысел',unknown:'Нет данных'});
-function fidelityRecord(feature,region) {
+function validEvidenceDate(value){
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
+  const d=new Date(value+'T00:00:00Z');
+  return Number.isFinite(d.valueOf())&&d.toISOString().slice(0,10)===value;
+}
+function fidelityRecord(feature,region,asOf='') {
   const p=feature?.properties||{},source=region?.layers?.vector||region?.source;
-  const evidence=p.fidelity||{};
+  const base=p.fidelity||{};
+  const timeline=[base,...(Array.isArray(base.history)?base.history.slice(0,500):[])].filter(v=>v&&validEvidenceDate(v.date)).sort((a,b)=>a.date.localeCompare(b.date));
+  const cutoff=validEvidenceDate(asOf)?asOf:'9999-12-31';
+  const evidence=timeline.filter(v=>v.date<=cutoff).at(-1)||(asOf?{}:base);
+  if(asOf&&!evidence.date)return {name:String(p.name||'Объект'),kind:'unknown',quality:'missing',author:'Нет данных',license:'Нет данных',reference:'',date:'',state:'Нет датированной записи'};
+
   const kind=Object.hasOwn(FIDELITY_KINDS,evidence.kind)?evidence.kind:source?.quality==='demo'?'fiction':'unknown';
   return {name:String(p.name||p.building||p.highway||p.railway||'Объект'),
     kind,quality:evidence.quality||source?.quality||'missing',author:evidence.attribution||source?.attribution||'Нет данных',
-    license:evidence.license||source?.license||'Нет данных',reference:evidence.reference||'',date:evidence.date||''};
+    license:evidence.license||source?.license||'Нет данных',reference:evidence.reference||'',date:evidence.date||'',state:evidence.state||'Не указано'};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={fidelityRecord,FIDELITY_KINDS};
 

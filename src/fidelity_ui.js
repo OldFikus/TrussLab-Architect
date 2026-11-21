@@ -3,7 +3,7 @@
   document.getElementById('planet-atlas').after(button);
   const dialog=document.createElement('dialog');dialog.id='fidelity-dialog';dialog.setAttribute('aria-label','FidelityLab');
   dialog.style.cssText='width:min(92vw,760px);max-height:87vh;overflow:auto;background:#18313a;color:#eff7f6';
-  dialog.innerHTML='<header><h2>FidelityLab</h2><button type="button" data-close>Закрыть</button></header><label>Объекты в видимых тайлах <select data-objects></select></label><dl data-record></dl>';
+  dialog.innerHTML='<header><h2>FidelityLab</h2><button type="button" data-close>Закрыть</button></header><label>Объекты в видимых тайлах <select data-objects></select></label><label>Состояние на дату <input type="date" data-asof></label><dl data-record></dl>';
   document.body.append(dialog);
   const select=dialog.querySelector('[data-objects]'),details=dialog.querySelector('[data-record]');
   let records=[];
@@ -11,8 +11,8 @@
     details.replaceChildren();
     const item=records[select.selectedIndex];
     if(!item){details.textContent='На экране нет объектов с загруженной геометрией.';return;}
-    const record=fidelityRecord(item.f,atlas.store.index?.region);
-    const fields={'Тайл':item.key,'Тип свидетельства':FIDELITY_KINDS[record.kind],'Оценка':record.quality,'Авторство':record.author,'Права':record.license,'Основание':record.reference||'Нет данных','Дата наблюдения':record.date||'Нет данных'};
+    const record=fidelityRecord(item.f,atlas.store.index?.region,dialog.querySelector('[data-asof]').value);
+    const fields={'Тайл':item.key,'Тип свидетельства':FIDELITY_KINDS[record.kind],'Оценка':record.quality,'Авторство':record.author,'Права':record.license,'Основание':record.reference||'Нет данных','Дата наблюдения':record.date||'Нет данных','Состояние':record.state};
     for(const [key,value] of Object.entries(fields)){
       const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=key;dd.textContent=value;details.append(dt,dd);
     }
@@ -33,7 +33,7 @@
     const url=URL.createObjectURL(new Blob([JSON.stringify(collection)],{type:'application/geo+json'}));
     const a=document.createElement('a');a.href=url;a.download='footprints.geojson';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
-  select.onchange=paint;
+  select.onchange=paint;dialog.querySelector('[data-asof]').onchange=paint;
   dialog.querySelector('[data-close]').onclick=()=>dialog.close();
 })();
 
