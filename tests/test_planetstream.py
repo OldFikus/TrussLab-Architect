@@ -20,6 +20,9 @@ with sync_playwright() as pw:
         page.wait_for_function("atlas.store.loaded===1 && atlas.store.mode==='Демо'")
         page.locator('#atlas-file-picker').set_input_files(ROOT/'examples/region')
         page.wait_for_function("atlas.store.loaded === 1 && atlas.stats.shapes === 1")
+        page.locator('#fidelity-open').click()
+        assert 'Вымысел' in page.locator('#fidelity-dialog [data-record]').inner_text()
+        page.locator('#fidelity-dialog [data-close]').click()
         assert 'CC0-1.0' in page.locator('#atlas-status').inner_text()
         assert abs(page.evaluate('mercatorUnproject(atlas.center.x,atlas.center.y).lon') - .005) < 1e-8
         page.locator('#atlas-demo').click()
