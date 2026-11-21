@@ -62,3 +62,15 @@ class PlanetCoverage {
   }
 }
 if (typeof module !== 'undefined' && module.exports) module.exports.PlanetCoverage=PlanetCoverage;
+
+/* Tile vertices stay in their local ENU frame. Only small offsets reach Float32. */
+function planetFrame(lat,lon) {
+  const phi=lat*Math.PI/180,lambda=lon*Math.PI/180;
+  const s=Math.sin(phi),c=Math.cos(phi),sl=Math.sin(lambda),cl=Math.cos(lambda);
+  return {anchor:{lat,lon,height:0},basis:[[-sl,cl,0],[-s*cl,-s*sl,c],[c*cl,c*sl,s]]};
+}
+function planetRotation(tile,camera) {
+  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  return new Float32Array(tile.basis.flatMap(axis=>camera.basis.map(target=>dot(axis,target))));
+}
+if(typeof module!=='undefined'&&module.exports)Object.assign(module.exports,{planetFrame,planetRotation});

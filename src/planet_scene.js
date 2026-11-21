@@ -26,19 +26,21 @@
     gl=canvas.getContext('webgl',{antialias:true,alpha:false});
     if(!gl)throw Error('WebGL недоступен');
     program=gl.createProgram();
-    const vs=shader(gl.VERTEX_SHADER,'attribute vec3 p;attribute vec2 uv;uniform vec2 offset;uniform vec2 pixel;varying vec2 tex;varying float height;void main(){vec2 q=p.xy+offset;gl_Position=vec4(q.x*pixel.x,(q.y*.66+p.z*.8)*pixel.y,clamp((q.y*.75-p.z)*pixel.y*.05,-.98,.98),1.);tex=uv;height=p.z;}');
+    const vs=shader(gl.VERTEX_SHADER,'attribute vec3 p;attribute vec2 uv;uniform vec3 offset;uniform mat3 rotation;uniform vec2 pixel;varying vec2 tex;varying float height;void main(){vec3 q=rotation*p+offset;gl_Position=vec4(q.x*pixel.x,(q.y*.66+q.z*.8)*pixel.y,clamp((q.y*.75-q.z)*pixel.y*.05,-.98,.98),1.);tex=uv;height=p.z;}');
     const fs=shader(gl.FRAGMENT_SHADER,'precision mediump float;uniform sampler2D image;uniform bool ground;uniform bool raster;varying vec2 tex;varying float height;void main(){vec4 c=ground?(raster?texture2D(image,tex):vec4(.21,.34,.33,1.)):vec4(.64+min(height*.006,.25),.66,.58,1.);if(c.a<.01)discard;gl_FragColor=c;}');
     gl.attachShader(program,vs);gl.attachShader(program,fs);gl.linkProgram(program);gl.deleteShader(vs);gl.deleteShader(fs);
     if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
     vertex={p:gl.getAttribLocation(program,'p'),uv:gl.getAttribLocation(program,'uv')};
-    for(const name of ['offset','pixel','ground','raster'])vertex[name]=gl.getUniformLocation(program,name);
+    for(const name of ['offset','rotation','pixel','ground','raster'])vertex[name]=gl.getUniformLocation(program,name);
   }
   function mesh(key,fc,span){
     const [tx,ty]=key.split(':').map(Number),x=tx*span,y=ty*span;
+    const site=mercatorUnproject(x,y),tileFrame=planetFrame(site.lat,site.lon);
+    const local=(lon,lat)=>{const p=geoToENU(lat,lon,0,tileFrame.anchor);return [p.east,p.north];};
     const data=[];
     const add=(a,b,h,u=0,v=0)=>data.push(a,b,h,u,v);
-    for(const [u,v] of [[0,0],[1,0],[1,1],[0,0],[1,1],[0,1]])add(u*span,v*span,0,u,1-v);
-    const project=coord=>{const p=mercatorProject(coord[0],coord[1]);return [p.x-x,p.y-y];};
+    for(const [u,v] of [[0,0],[1,0],[1,1],[0,0],[1,1],[0,1]]){const g=mercatorUnproject(x+u*span,y+v*span);add(...local(g.lon,g.lat),0,u,1-v);}
+    const project=coord=>local(coord[0],coord[1]);
     for(const f of fc.features){
       const g=f.geometry;if(!g)continue;
       if(data.length>160000)break;
@@ -47,7 +49,7 @@
         if(polygon.length!==1 || polygon[0].length>512)continue;
         const ring=polygon[0].slice(0,-1).map(project);
         if(ring.length<3)continue;
-        const height=Math.max(1,Math.min(300,Number(f.properties?.height)||9))/Math.max(.08,Math.cos(mercatorUnproject(x,y).lat*Math.PI/180));
+        const height=Math.max(1,Math.min(300,Number(f.properties?.height)||9));
         if(cityPolygonArea(ring)<0)ring.reverse();
         const roof=triangulateRing(ring);
         for(const triangle of roof)for(const point of triangle)add(...point,height);
@@ -72,7 +74,7 @@
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
     if(fc.raster)gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,fc.raster);
     else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([60,90,88,255]));
-    const entry={x,y,buffer,texture,count:array.length/5,bytes:size,raster:!!fc.raster};
+    const entry={tileFrame,buffer,texture,count:array.length/5,bytes:size,raster:!!fc.raster};
     bytes+=size;loads++;cache.set(key,entry);return entry;
   }
   function render(){
@@ -84,8 +86,10 @@
     gl.enable(gl.DEPTH_TEST);gl.useProgram(program);
     gl.uniform2f(vertex.pixel,scale*2/w,scale*2/h);
     const index=atlas.store.index;if(!index)return;
+    const geo=mercatorUnproject(origin.x,origin.y),camera=planetFrame(geo.lat,geo.lon);
+    const latitudeScale=Math.max(.08,Math.cos(geo.lat*Math.PI/180));
     const span=index.size,cx=Math.floor(origin.x/span),cy=Math.floor(origin.y/span);
-    const rx=Math.min(4,Math.ceil(w/(2*scale*span))+1),ry=Math.min(4,Math.ceil(h/(scale*span))+1);
+    const rx=Math.min(4,Math.ceil(w/(2*scale*span*latitudeScale))+1),ry=Math.min(4,Math.ceil(h/(scale*span*latitudeScale))+1);
     const keys=[];
     for(let dx=-rx;dx<=rx;dx++)for(let dy=-ry;dy<=ry;dy++){
       const key=(cx+dx)+':'+(cy+dy);if(index.tiles.has(key))keys.push(key);
@@ -101,7 +105,9 @@
       for(const [loc,n,offset] of [[vertex.p,3,0],[vertex.uv,2,12]]){
         gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,n,gl.FLOAT,false,20,offset);
       }
-      gl.uniform2f(vertex.offset,entry.x-origin.x,entry.y-origin.y);
+      const site=entry.tileFrame.anchor,offset=geoToENU(site.lat,site.lon,0,camera.anchor);
+      gl.uniform3f(vertex.offset,offset.east,offset.north,offset.up);
+      gl.uniformMatrix3fv(vertex.rotation,false,planetRotation(entry.tileFrame,camera));
       gl.uniform1i(vertex.raster,entry.raster);gl.uniform1i(vertex.ground,1);gl.drawArrays(gl.TRIANGLES,0,6);
       gl.uniform1i(vertex.ground,0);gl.drawArrays(gl.TRIANGLES,6,entry.count-6);triangles+=entry.count/3;
     }
@@ -109,7 +115,12 @@
     if(uploaded||atlas.store.pending.size||atlas.store.queue.length)queue();
   }
   function queue(){if(!frame)frame=requestAnimationFrame(render);}
-  function move(dx,dy){origin.x-=dx/scale;origin.y+=dy/(scale*.66);queue();}
+  function move(dx,dy){
+    const lat=mercatorUnproject(origin.x,origin.y).lat, factor=Math.max(.08,Math.cos(lat*Math.PI/180));
+    const half=20037508.342789244;
+    origin.x=((origin.x-dx/(scale*factor)+half)%(2*half)+2*half)%(2*half)-half;
+    origin.y=Math.max(-half,Math.min(half,origin.y+dy/(scale*.66*factor)));queue();
+  }
   function zoom(step){scale=Math.min(4,Math.max(.015,scale*step));queue();}
   button.onclick=()=>{
     if(!atlas.store.index){atlas.statusMessage('Сначала откройте пакет или деморегион');return;}

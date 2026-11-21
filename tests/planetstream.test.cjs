@@ -18,3 +18,10 @@ assert.equal(overview.reduce((s,c)=>s+c.features,0),2*many.size);
 assert.ok(overview.length<=96);
 assert.equal(coverage.query(200,200,240,240).length,0);
 assert.deepEqual(new PlanetCoverage(new Map()).query(0,0,1,1),[]);
+const {planetFrame,planetRotation}=require('../src/planetstream');
+for(const [lat,lon] of [[-70,-179.99],[0,0],[75,179.99]]){
+  const frame=planetFrame(lat,lon),identity=planetRotation(frame,frame);
+  identity.forEach((n,i)=>assert.ok(Math.abs(n-(i%4===0?1:0))<1e-6));
+  const other=planetFrame(lat,lon+.01),rot=planetRotation(frame,other);
+  assert.ok(Math.abs(Math.hypot(...rot.slice(0,3))-1)<1e-6);
+}
