@@ -1,6 +1,9 @@
 """Interact with the standalone HTML and import an offline region from disk."""
 from pathlib import Path
 import os
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from tools.build import VERSION
 from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 with sync_playwright() as pw:
@@ -10,7 +13,7 @@ with sync_playwright() as pw:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.context.set_offline(True)
     for profile in ('SAFE','LAB'):
-        page.goto(next((ROOT/'dist').glob('TrussLab_*_'+profile+'.html')).as_uri())
+        page.goto((ROOT/'dist'/f'TrussLab_{VERSION}_{profile}.html').as_uri())
         page.locator('#atlas-open').click()
         page.locator('#atlas-file-picker').set_input_files(ROOT/'examples/region')
         page.wait_for_function("atlas.store.loaded === 1 && atlas.stats.shapes === 1")

@@ -29,9 +29,10 @@ jobs:
       - name: Build and test both standalone profiles
         run: |
           python tools/build.py
-          python -m pip install playwright
+          python -m pip install playwright -r tools/requirements-region.txt
           python -m playwright install --with-deps chromium
           python tests/test_planetstream.py
+          python tests/test_region_import.py
           for archive in dist/*.zip; do unzip -tq "$archive"; done
       - name: Publish tested build
         env:

@@ -442,6 +442,7 @@ function mercatorUnproject(x,y){
 }
 function regionTileKey(x,y,tileSize){return `${Math.floor(x/tileSize)}:${Math.floor(y/tileSize)}`;}
 function validateRegionIndex(raw){
+ const planet=raw?.type==='TrussLabPlanetRegion';
  raw=unpackPlanetRegion(raw);
  if(raw?.type!=='TrussLabRegionIndex'||raw.version!==1||raw.projection!=='EPSG:3857')throw Error('Нужен TrussLabRegionIndex v1 (EPSG:3857)');
  const size=raw.tileSizeMeters;
@@ -454,11 +455,13 @@ function validateRegionIndex(raw){
   if(!/^-?\d+:-?\d+$/.test(key))throw Error('Недопустимый ключ тайла');
   const [tx,ty]=key.split(':').map(Number);
   if(!Number.isSafeInteger(tx)||!Number.isSafeInteger(ty)||Math.abs(tx)>10000000||Math.abs(ty)>10000000)throw Error('Неверные координаты тайла');
+  if(val?.raster!==undefined && (!planet || typeof val.raster!=='string' || val.raster.length>200 || !/^tiles\/[a-zA-Z0-9_-]+\.png$/.test(val.raster)))throw Error('Некорректный путь растра');
+  if(val?.raster && val.path===undefined && val.features===0){tiles.set(key,{raster:val.raster,features:0});continue;}
   if(typeof val?.path!=='string'||val.path.length>200||!/^tiles\/[a-zA-Z0-9_\-]+\.geojson$/.test(val.path)||val.path.includes('..'))throw Error('Недопустимый путь тайла');
   if(!Number.isInteger(val.features)||val.features<0||val.features>200000)throw Error('Некорректное число объектов');
-  tiles.set(key,{path:val.path,features:val.features});
+  tiles.set(key,{path:val.path,raster:val.raster,features:val.features});
  }
- return {size,tiles,metadata:raw.metadata||{},report:raw.report||{}};
+ return {size,tiles,region:planet?raw.metadata.region:null,metadata:raw.metadata||{},report:raw.report||{}};
 }
 function normalizeRegionFiles(files){
  const map=new Map();
@@ -466,7 +469,7 @@ function normalizeRegionFiles(files){
   const path=(file.webkitRelativePath||file.name||'').replaceAll('\\','/');
   // Strip only the chosen root directory; retain tiles/<name>.geojson.
   const parts=path.split('/');const name=parts.length>1?parts.slice(1).join('/'):path;
-  if(name==='index.json'||/^tiles\/[a-zA-Z0-9_\-]+\.geojson$/.test(name))map.set(name,file);
+  if(name==='index.json'||/^tiles\/[a-zA-Z0-9_\-]+\.(?:geojson|png)$/.test(name))map.set(name,file);
  }
  return map;
 }
@@ -478,7 +481,7 @@ class RegionTileStore{
  }
  setManifest(raw,{files=null,baseURL=null,inline=null,mode='files'}={}){
   this.index=validateRegionIndex(raw);this.files=files||new Map();this.baseURL=baseURL;
-  this.inline=inline||new Map();this.mode=mode;this.queue=[];this.pending.clear();this.cache.clear();this.loaded=0;this.failures=0;this.failedKeys.clear();
+  this.inline=inline||new Map();this.mode=mode;this.queue=[];this.pending.clear();for(const fc of this.cache.values())fc.raster?.close();this.cache.clear();this.loaded=0;this.failures=0;this.failedKeys.clear();
   this.epoch=(this.epoch||0)+1;this.onUpdate();return this.index;
  }
  async openDirectory(fileList){
@@ -496,14 +499,14 @@ class RegionTileStore{
  }
  stats(){return {indexed:this.index?.tiles.size||0,cached:this.cache.size,loaded:this.loaded,pending:this.pending.size,queued:this.queue.length,failures:this.failures,mode:this.mode};}
  get(key){const item=this.cache.get(key);if(item){this.cache.delete(key);this.cache.set(key,item);}return item||null;}
- _evict(){while(this.cache.size>this.limit){const oldest=this.cache.keys().next().value;this.cache.delete(oldest)}}
+ _evict(){while(this.cache.size>this.limit){const oldest=this.cache.keys().next().value;this.cache.get(oldest)?.raster?.close();this.cache.delete(oldest)}}
  _pull(){
   while(this.pending.size<this.parallel&&this.queue.length){
    const item=this.queue.shift(),key=item.key;
    if(this.pending.has(key)||this.cache.has(key)||this.failedKeys.has(key))continue;
    this.pending.add(key);const epoch=this.epoch;
    this._load(key).then(fc=>{
-    if(this.epoch!==epoch)return;
+    if(this.epoch!==epoch){fc.raster?.close();return;}
     this.cache.set(key,fc);this.loaded++;this._evict();
    }).catch(err=>{
     if(this.epoch!==epoch)return;
@@ -516,7 +519,19 @@ class RegionTileStore{
  }
  async _load(key){
   const source=this.index.tiles.get(key),path=source?.path;
-  if(!path)throw Error('Нет тайла в индексе: '+key);
+  const rasterFile=this.files.get(source?.raster),baseURL=this.baseURL;
+  const fc=path?await this._loadVector(path):{type:'FeatureCollection',features:[]};
+  if(source?.raster){
+   let blob=rasterFile;
+   if(!blob && baseURL){const response=await fetch(new URL(source.raster,baseURL));if(response.ok)blob=await response.blob();}
+   if(!blob || blob.size>512000)throw Error('Растр недоступен: '+source.raster);
+   const header=new DataView(await blob.slice(0,24).arrayBuffer());
+   if(header.byteLength!==24 || header.getUint32(0)!==0x89504e47 || header.getUint32(16)!==256 || header.getUint32(20)!==256)throw Error('Требуется PNG 256×256');
+   fc.raster=await createImageBitmap(blob);
+  }
+  return fc;
+ }
+ async _loadVector(path){
   let content;
   if(this.inline.has(path))content=JSON.stringify(this.inline.get(path));
   else if(this.files.has(path)){
@@ -603,7 +618,7 @@ class RegionAtlas{
   document.getElementById('atlas-file-picker')?.addEventListener('change',async e=>{
    try{const files=[...(e.target.files||[])];if(!files.length)return;
     const idx=await this.store.openDirectory(files);this.error='';
-    const region=idx.metadata.region;if(region)this.goTo(region.center[1],region.center[0],.09);
+    const region=idx.region;if(region)this.goTo(region.center[1],region.center[0],.09);
     this.schedule();
     this.statusMessage(`Папка подключена: ${idx.tiles.size} тайлов. Загружается только область на экране.`);
    }catch(err){this.error=err.message;this.statusMessage('Ошибка папки: '+err.message)}finally{e.target.value=''}
@@ -711,6 +726,7 @@ class RegionAtlas{
    const [ix,iy]=key.split(':').map(Number);const [xl,yt]=this.worldToScreen(ix*tileSize,(iy+1)*tileSize);
    const [xr,yb]=this.worldToScreen((ix+1)*tileSize,iy*tileSize);
    ctx.save();ctx.beginPath();ctx.rect(xl,yt,xr-xl,yb-yt);ctx.clip();
+   if(fc.raster)ctx.drawImage(fc.raster,xl,yt,xr-xl,yb-yt);
    // Draw transport first, then buildings on top; provenance remains in GeoJSON.
    const groups=[[],[],[]];for(const f of fc.features){
     const p=f.properties||{},t=String(p.trusslab_source_type||p.type||'').toLowerCase();
@@ -735,7 +751,7 @@ class RegionAtlas{
   if(ax>-30&&ax<w+30&&ay>-30&&ay<h+30){ctx.fillStyle='#f5b55b';ctx.beginPath();ctx.arc(ax,ay,4.5,0,Math.PI*2);ctx.fill();ctx.font='12px system-ui';ctx.fillText('≈ Керчь / геореференс',ax+10,ay-12)}
   const stats=this.store.stats(),place=mercatorUnproject(this.center.x,this.center.y);
   const line=`${this.store.mode==='none'?'Нет регионального набора':this.store.mode} · ${stats.cached}/${stats.indexed} в кэше · на экране ${paintedTiles} тайлов, ${shapes} объектов · центр ${place.lat.toFixed(4)}°, ${place.lon.toFixed(4)}°`;
-  const region=this.store.index?.metadata?.region;
+  const region=this.store.index?.region;
   const credit=region?region.name+' · '+region.source.quality+' · '+region.source.attribution+' · '+region.source.license+' | ':'';
   if(this.status)this.status.textContent=credit+(this.tooFar?'Слишком большой обзор для загрузки тайлов: увеличь масштаб. Крым показан только схематично.':this.error&&stats.mode==='none'?this.error:line+(stats.failures?' · ошибок загрузки: '+stats.failures:''));
   const scaleEl=document.getElementById('atlas-scale');if(scaleEl)scaleEl.textContent=`${(120/this.scale/1000).toFixed(2)} км / 120 px (проекционная шкала)`;
