@@ -92,10 +92,15 @@ function parseGeoPack(pack){
   const bytes=b64decode(pack.dem.data);
   if(bytes.length!==n*n*2)throw Error('Повреждена модель высот: неверный размер.');
   const values=new Int16Array(n*n),view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
-  for(let i=0;i<values.length;i++)values[i]=view.getInt16(i*2,true);
+  const noData=Number(pack.dem.noData??-32768);
+  let validCount=0;
+  for(let i=0;i<values.length;i++){
+   values[i]=view.getInt16(i*2,true);
+   if(values[i]!==noData)validCount++;
+  }
   const scale=Number(pack.dem.scaleMetres);
   if(!Number.isFinite(scale)||scale<=0||scale>100)throw Error('Недопустимый масштаб высот.');
-  out.dem={values,scaleMetres:scale,noData:Number(pack.dem.noData??-32768)};
+  out.dem={values,scaleMetres:scale,noData,validCount};
  }
  if(!out.coast&&!out.dem)throw Error('GeoPack пуст: нет берегов или высот.');
  return out;
@@ -640,7 +645,7 @@ class RegionAtlas{
   document.getElementById('atlas-3d')?.addEventListener('click',()=>{
    if(!this.store.index){this.statusMessage('Сначала подключи региональные данные.');return}
    const here=mercatorUnproject(this.center.x,this.center.y),bridge=geoToScene(here.lat,here.lon);
-   if(Math.max(Math.abs(bridge.x),Math.abs(bridge.z))>185){this.statusMessage('3D в 10.3 доступен только внутри области моста. Для остальных регионов пока используется 2D-атлас.');return}
+   if(Math.max(Math.abs(bridge.x),Math.abs(bridge.z))>185){this.statusMessage('Для этого участка откройте «Этот район в 3D». В локальную сцену можно перенести только объекты в её границах.');return}
    const features=this.store.loadedFeatureCollection(this.viewKeys,11000);
    if(!features.features.length){this.statusMessage('Для 3D дождись загрузки региональных тайлов в этой области.');return}
    try{this.onLocal3D(features);this.statusMessage('Локальный фрагмент перенесён в 3D-мост.');this.close()}
@@ -2738,10 +2743,7 @@ void main(){vec3 n=normalize(vN),sun=normalize(vec3(.45,.84,.34));
  float fog=clamp((vFog-80.)/max(70.,farScale*2.),0.,.82);
  col=mix(col,vec3(.49,.67,.77),fog);
  gl_FragColor=vec4(col,1.);}`;
-/* Compact, opt-in quality shader: no cascade-shadow samplers, no dynamic
- * light loops, no texture arrays, no GPU extensions. It intentionally stays
- * below the former 13.6-kB fragment stage that loses context on some ANGLE
- * drivers. It is NOT the historical heavy program. */
+/* LAB uses cached static shadows and capability-dependent material textures. */
 const TRUSS_BALANCED_VS=`attribute vec3 p;attribute vec3 n;attribute float m;
 uniform mat4 vp;uniform float time;
 varying vec3 vP;varying vec3 vN;varying float vM;varying float vFog;
@@ -2757,10 +2759,17 @@ uniform vec3 sunDirection;uniform vec3 sunColor;
 uniform mat4 lightVP;uniform sampler2D shadowMap;uniform float shadowEnabled;
 uniform vec2 shadowTexel;uniform float shadowSoftness;uniform mat4 reflectVP;uniform sampler2D waterReflection;uniform vec2 reflectionTexel;uniform float reflectionFine;
 uniform float reflectionEnabled;uniform float reflectionPass;
+uniform mat4 lightVPNear, lightVPMid;
+uniform sampler2D shadowMapNear, shadowMapMid;
+uniform vec3 cascadeSplits;
+uniform vec4 headlamp[4];uniform float headlampCount;
+uniform sampler2D materialAtlas;uniform float materialAtlasEnabled;uniform float materialArrayReady;
+#ifdef USE_MATERIAL_ARRAY
+uniform highp sampler2DArray materialArray;
+#endif
 float depthOf(vec4 c){return dot(c,vec4(1./16777216.,1./65536.,1./256.,1.));}
-float softSunShadow(vec3 position,float ndl){
- if(shadowEnabled<.5)return 1.;
- vec4 clip=lightVP*vec4(position,1.);
+float sampleShadow(sampler2D map, mat4 matrix,vec3 position,float ndl){
+ vec4 clip=matrix*vec4(position,1.);
  if(clip.w<=0.)return 1.;
  vec3 sc=clip.xyz/clip.w*.5+.5;
  if(sc.x<=.003||sc.y<=.003||sc.x>=.997||sc.y>=.997||sc.z>=1.||sc.z<0.)return 1.;
@@ -2769,15 +2778,22 @@ float softSunShadow(vec3 position,float ndl){
  if(shadowSoftness>.5){
   for(int a=-1;a<=1;a++)for(int b=-1;b<=1;b++){
    vec2 uv=sc.xy+vec2(float(a),float(b))*shadowTexel;
-   v+=step(sc.z-bias,depthOf(texture2D(shadowMap,uv)));
+   v+=step(sc.z-bias,depthOf(texture2D(map,uv)));
   }
   return v/9.;
  }
  for(int a=0;a<2;a++)for(int b=0;b<2;b++){
   vec2 uv=sc.xy+(vec2(float(a),float(b))-.5)*shadowTexel;
-  v+=step(sc.z-bias,depthOf(texture2D(shadowMap,uv)));
+  v+=step(sc.z-bias,depthOf(texture2D(map,uv)));
  }
  return v*.25;
+}
+float softSunShadow(vec3 p,float ndl){
+ if(shadowEnabled<.5)return 1.;
+ float d=length(p-cameraPos);
+ if(d<cascadeSplits.x)return sampleShadow(shadowMapNear,lightVPNear,p,ndl);
+ if(d<cascadeSplits.y)return sampleShadow(shadowMapMid,lightVPMid,p,ndl);
+ return sampleShadow(shadowMap,lightVP,p,ndl);
 }
 float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.54);}
 vec3 pal(float m){
@@ -2818,8 +2834,30 @@ void main(){
   lam=max(0.,dot(N,sun));
  }
  float shadow=softSunShadow(vP,lam);
- float light=.42+.60*lam*mix(.32,1.,shadow);
- c*=light;
+ float rough=m==5.?.34:.82,metal=m==5.?.81:0.;
+if(materialAtlasEnabled>.5 && ((m>2.5&&m<5.5)||(m>10.5&&m<11.5))){
+  float index=(m>2.5&&m<3.5)?0.:(m>3.5&&m<4.5)?1.:(m>4.5&&m<5.5)?2.:3.;
+  vec2 tile=fract(vP.xz*(index==0.?1.6:index==1.?1.2:2.3));
+  #ifdef USE_MATERIAL_ARRAY
+  vec4 texel=materialArrayReady>.5?texture(materialArray,vec3(tile,index)):texture2D(materialAtlas,(vec2(index,0.)+tile)/vec2(4.,1.));
+#else
+  vec4 texel=texture2D(materialAtlas,(vec2(index,0.)+tile)/vec2(4.,1.));
+#endif
+  c=mix(c,texel.rgb,.50);rough=mix(rough,texel.a,.48);
+}
+ vec3 H=normalize(sun+V);
+ c=pow(max(c,vec3(0.)),vec3(2.2));
+float ndv=max(dot(N,V),.03),ndh=max(dot(N,H),0.),vdh=max(dot(V,H),0.);
+float alpha=max(.045,rough*rough),a2=alpha*alpha;
+float den=ndh*ndh*(a2-1.)+1.;float D=a2/(3.14159265*den*den+.0001);
+float k=(rough+1.)*(rough+1.)/8.;
+float G=lam/(lam*(1.-k)+k+.0001)*ndv/(ndv*(1.-k)+k+.0001);
+vec3 F0=mix(vec3(.04),c,metal);vec3 F=F0+(vec3(1.)-F0)*pow(1.-vdh,5.);
+vec3 kD=(vec3(1.)-F)*(1.-metal);
+vec3 diffuse=kD*c/3.14159265;
+vec3 specular=min(vec3(3.),D*G*F/(4.*lam*ndv+.003));
+ c=c*.57+(diffuse+specular)*lam*sunColor*mix(.22,1.,shadow)*1.7;
+ c=pow(c/(c+vec3(.85)),vec3(1./2.2));
  if(m>5.5&&m<6.5&&reflectionEnabled>.5&&reflectionPass<.5){
    vec4 rp=reflectVP*vec4(vP,1.);
    vec2 q=rp.xy/max(rp.w,.001)*.5+.5;
@@ -2843,6 +2881,21 @@ void main(){
  if(m>26.5&&m<27.5)c=mix(c,vec3(.97,.70,.36),dark>.5?.72:.03);
  if(dark>.5)c*=.49;
  if(weather>1.5)c*=.68;
+if(weather>1.5 && headlampCount>.5 && m>2.5 && !(m>5.5&&m<6.5)){
+ vec3 beams=vec3(0.);
+ for(int j=0;j<4;j++){
+  if(float(j)>=headlampCount)break;
+  vec3 offset=vP-headlamp[j].xyz;float d2=dot(offset,offset);
+  float axis=offset.x*headlamp[j].w;
+  float side=sqrt(offset.y*offset.y+offset.z*offset.z);
+  float cone=smoothstep(.49,.83,axis/(sqrt(d2)+.001));
+  float range=1./(1.+d2*.023+d2*d2*.00029);
+  float facing=max(dot(N,normalize(-offset)),.13);
+  beams+=vec3(.94,.92,.75)*cone*range*facing*5.2;
+ }
+ c+=pow(pal(m),vec3(2.2))*min(beams,vec3(.92));
+}
+
  float fog=clamp((vFog/max(farScale,1.)-.26)*.69,0.,.75);
  vec3 sky=dark>.5?vec3(.08,.13,.22):vec3(.50,.69,.80);
  c=mix(c,sky,fog);
@@ -2886,7 +2939,7 @@ gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);this.g
  this.shadowsEnabled=true;this.qualityEffects={shadows:true,reflections:true};
  this.postQuality='fxaa';this.aaMode='hybrid';this.waterMode='balanced';this.reflectionQuality='medium';
  this.pbrArray=null;this.pbrAtlas=null;
- this.gpuFailures.push('BALANCED GPU: single cached shadow atlas + planar water reflection + MSAA/FXAA');
+ this.gpuFailures.push('BALANCED GPU: cached shadows + planar water reflection + MSAA/FXAA');
 }
 this.msaaSamples=this.gl.getParameter(this.gl.SAMPLES)||0;};
 let gpuReady=false;
@@ -4363,6 +4416,7 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  /** Balanced-only shadow map: one small cached render target; no 13kB master shader. */
  renderQualityShadows(rig){
   if(!this.gpuBalancedMode||!this.qualityEffects.shadows||!this.shadowsEnabled||this.daylight==='night'||!this.ensureShadowFramebuffer())return false;
+  if(this.qualityShadowDetail==='fine' && this.quality!=='low')return this.renderStaticShadows(rig);
   const now=performance.now(),eye=this.camPos,forward=this.cameraBasis().forward;
   const c=add(eye,scale(forward,80)),radius=this.qualityShadowDetail==='fine'?190:260;
   const sun=norm(rig.sun),step=radius*2/this.shadowSize;
@@ -4457,7 +4511,7 @@ addBridge(m,s){let mod=s.model,L=s.span,shift=-L/2,yd=3.0,geom=mod?.nodes||[],by
  gl.uniformMatrix4fv(this.uLightVP,false,new Float32Array(this.shadowMatrix||matmul(orthographic(-310,310,-310,310,10,940),lookAt([0,400,0],[0,0,0]))));
  gl.uniformMatrix4fv(this.uLightVPNear,false,new Float32Array(this.cascades[0]?.matrix||this.shadowMatrix||this.vp));
  gl.uniformMatrix4fv(this.uLightVPMid,false,new Float32Array(this.cascades[1]?.matrix||this.shadowMatrix||this.vp));
- gl.uniform3fv(this.uCascadeSplits,new Float32Array(this.cascadeSplits));
+ gl.uniform3fv(this.uCascadeSplits,new Float32Array(this.gpuBalancedMode && (this.qualityShadowDetail!=='fine'||this.quality==='low')?[0,0,0]:this.cascadeSplits));
  gl.uniform1f(this.uShadowOn,shadowsActive?1:0);gl.uniform1f(this.uAmbientLift,this.ambientLift);gl.uniform1f(this.uShadowOpacity,this.shadowOpacity);
  gl.uniform2f(this.uShadowTexel,1/Math.max(1,this.shadowSize),1/Math.max(1,this.shadowSize));
  if(this.uShadowSoftness)gl.uniform1f(this.uShadowSoftness,this.qualitySoftShadows?1:0);if(this.uReflectionTexel)gl.uniform2f(this.uReflectionTexel,1/Math.max(1,this.reflection?.size||512),1/Math.max(1,this.reflection?.size||512));if(this.uReflectionFine)gl.uniform1f(this.uReflectionFine,this.qualityReflectionDetail==='high'?1:0);

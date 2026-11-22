@@ -17,6 +17,14 @@ with sync_playwright() as pw:
     dialog.locator('[data-save]').click()
     summary = dialog.locator('output').inner_text()
     assert 'Объектов: 1' in summary and '%' in summary, summary
+    coverage = page.evaluate("""() => {
+      const values = new Int16Array(256).fill(-999); values[0]=0;
+      const dem=parseGeoPack({type:'TrussLabGeoPack',version:1,gridSize:16,sceneSize:100,
+        dem:{noData:-999,scaleMetres:1,encoding:'int16le/base64',data:btoa(String.fromCharCode(...new Uint8Array(values.buffer)))}}).dem;
+      return [dem.validCount,dem.values.length];
+    }""")
+    assert coverage == [1,256]
+    assert 'Покрытие сетки высот' in dialog.inner_text()
     stored = dialog.locator('textarea').input_value()
     dialog.locator('textarea').fill('{}')
     dialog.locator('[data-save]').click()

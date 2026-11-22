@@ -13,7 +13,7 @@ p.innerHTML=`<header><strong>✦ GPU CLARITY · NATIVE RESOLUTION / AA</strong><
 <label for="q-sharp">Резкость (ограниченная)</label><select id="q-sharp"><option value="0">Выкл.</option><option value="0.08">Деликатная</option><option value="0.16">Чёткая</option><option value="0.24">Высокая</option></select>
 <label for="q-fxaa-strength">Сила FXAA (в Native Sharp не используется)</label><select id="q-fxaa-strength"><option value="0">Выкл.</option><option value="0.25">Лёгкая · меньше мыла</option><option value="0.55">Средняя</option><option value="1">Полная</option></select>
 <label><input id="q-soft-shadow" type="checkbox"> Мягкие тени PCF 3×3 · BALANCED</label>
-<label for="q-shadow-detail">Точная теневая карта</label><select id="q-shadow-detail"><option value="standard">Стандарт · радиус 260 м, 1024²</option><option value="fine">Ближняя · 190 м, до 1536²</option></select>
+<label for="q-shadow-detail">Точная теневая карта</label><select id="q-shadow-detail"><option value="standard">Стандарт · радиус 260 м, 1024²</option><option value="fine">Каскады · ближний, средний и дальний</option></select>
 <label for="q-reflection-detail">Качество отражений</label><select id="q-reflection-detail"><option value="standard">Стандарт · до 512²</option><option value="high">Повышенное · до 768² + фильтр</option></select>
 </div>
 <div class="q-status" id="q-report">Статус графики</div><div class="q-row"><button id="q-fullscreen">⛶ На весь экран</button><button id="q-diagnostics">Обновить сведения</button><button id="q-switch">Изменить GPU профиль</button></div>

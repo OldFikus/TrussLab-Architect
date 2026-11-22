@@ -73,7 +73,12 @@
     }
     return 'Объектов: '+current.features.length+' · длина проекций береговых отрезков: '+metres.toFixed(1)+' м · максимальный уклон: '+(steepest === null ? 'нет высот' : steepest.toFixed(2)+'%');
   }
-  button.onclick = () => { field.value = JSON.stringify(current,null,2); status.textContent = describe(); dlg.showModal(); };
+  const coverage = document.createElement('p');
+  dlg.querySelector('fieldset').before(coverage);
+  button.onclick = () => {
+    const dem = atlas.geoPack?.dem;
+    coverage.textContent = dem ? 'Покрытие сетки высот: '+dem.validCount+' из '+dem.values.length+' ячеек ('+(100*dem.validCount/dem.values.length).toFixed(1)+'%).' : 'Сетка высот отсутствует.';
+    field.value = JSON.stringify(current,null,2); status.textContent = describe(); dlg.showModal(); };
   dlg.querySelector('[data-close]').onclick = () => dlg.close();
   dlg.querySelector('[data-example]').onclick = () => {
     const {lon,lat} = mercatorUnproject(atlas.center.x,atlas.center.y);

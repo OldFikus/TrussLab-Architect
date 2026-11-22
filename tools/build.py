@@ -11,7 +11,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'src'
 DIST = ROOT / 'dist'
-VERSION = '20.0'
+VERSION = '20.1'
 SERIES = 'WorldForge'
 GROUPS = {
     'STYLES': 'style.css worldeditor.css infrastructure.css citysim_plus.css world_visual.css nature.css quality_ui.css',

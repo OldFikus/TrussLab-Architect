@@ -28,6 +28,18 @@ with sync_playwright() as pw:
       api:world3d.gpuBackend.api,renderer:ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl?.getParameter(gl.RENDERER)||'2D',
       lost:gl?.isContextLost()||false,canvas:[world3d.canvas.width,world3d.canvas.height]}}""")
     assert not errors and not data['lost'] and min(data['canvas'])>1,(errors,data)
+    page.locator('#q-close').click()
+    page.locator('#region3d-open').click()
+    available = page.evaluate('async()=>Boolean(await navigator.gpu?.requestAdapter())')
+    data['webgpuAdapter'] = available
+    if available:
+        assert page.evaluate('async()=>Boolean(region3d.webgpu || await region3d.enableWebGPU())')
+        page.evaluate('region3d.webgpu.device.destroy()')
+        page.wait_for_function('!region3d.webgpu && region3d.webgpuError.length>0')
+        assert page.evaluate('region3d.active && Boolean(region3d.gl||region3d.software)')
+        assert page.evaluate('async()=>await region3d.enableWebGPU()')
+        data['webgpuRecreated'] = True
+    assert not errors, errors
     data.update(os=platform.system(),engine=engine,version=browser.version)
     print(json.dumps(data,ensure_ascii=False))
     Path(f'compat-{platform.system()}-{engine}.json').write_text(json.dumps(data,ensure_ascii=False))
