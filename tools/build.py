@@ -11,7 +11,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'src'
 DIST = ROOT / 'dist'
-VERSION = '19.6'
+VERSION = '19.7'
 SERIES = 'ReleaseCandidate'
 GROUPS = {
     'STYLES': 'style.css worldeditor.css infrastructure.css citysim_plus.css world_visual.css nature.css quality_ui.css',
@@ -47,6 +47,9 @@ def build():
         path.write_text(page)
         print(path.name, hashlib.sha256(path.read_bytes()).hexdigest())
     with ZipFile(DIST / f'TrussLab_{VERSION}_Portable.zip','w',ZIP_DEFLATED) as archive:
+        archive.write(ROOT/'docs/DATA_AND_LICENSES_RU.md','DATA_AND_LICENSES_RU.md')
+        for license_path in sorted((ROOT/'docs/licenses').glob('*.txt')):
+            archive.write(license_path,'licenses/'+license_path.name)
         archive.write(ROOT/'docs/EDITOR_GUIDE_RU.md','EDITOR_GUIDE_RU.md')
         for path in [*DIST.glob(f'TrussLab_{VERSION}_*.html'), *sorted((ROOT/'examples').rglob('*'))]:
             if path.is_file(): archive.write(path, path.name if path.parent == DIST else path.relative_to(ROOT))
