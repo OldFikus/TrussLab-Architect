@@ -456,18 +456,29 @@ class RegionTileStore{
   this.loaded=0;this.failures=0;this.failedKeys=new Set();this.partialKeys=new Set();this.mode='none';this.onUpdate=()=>{};
  }
  setManifest(raw,{files=null,baseURL=null,inline=null,mode='files'}={}){
-  this.index=validateRegionIndex(raw);this.files=files||new Map();this.baseURL=baseURL;
+  const validated=validateRegionIndex(raw);this.importSerial=(this.importSerial||0)+1;
+  this.index=validated;this.files=files||new Map();this.baseURL=baseURL;
   this.inline=inline||new Map();this.mode=mode;this.queue=[];this.pending.clear();for(const fc of this.cache.values())fc.raster?.close();this.cache.clear();this.loaded=0;this.failures=0;this.failedKeys.clear();this.partialKeys.clear();
   this.epoch=(this.epoch||0)+1;
   if(this.index.region)window.dispatchEvent(new CustomEvent('planet-region-loaded',{detail:{raw,options:{files,baseURL,inline,mode}}}));
   this.onUpdate();return this.index;
  }
- async openDirectory(fileList){
+ async openDirectory(fileList,onProgress=()=>{}){
+  const request=(this.importSerial||0)+1;this.importSerial=request;
+  onProgress(0,0,0);
   const files=normalizeRegionFiles(fileList),manifest=files.get('index.json');
   if(!manifest)throw Error('В папке нет index.json; выбери папку, созданную build_region_tiles.py');
   if(manifest.size>32*1024*1024)throw Error("Индекс превышает 32 МиБ");
   const raw=JSON.parse(await manifest.text());
-  return this.setManifest(raw,{files,mode:'directory'});
+  const index=raw.type==='TrussLabPlanetRegion'?raw.index:raw;
+  const entries=Object.values(index?.tiles||{});if(entries.length>300000)throw Error('Слишком много тайлов');
+  let missing=0;
+  for(let i=0;i<entries.length;i++){
+   for(const name of [entries[i]?.path,entries[i]?.raster])if(name&&!files.has(name))missing++;
+   if((i+1)%4096===0){onProgress(i+1,entries.length,missing);await new Promise(ok=>setTimeout(ok,0));if(request!==this.importSerial)return null;}
+  }
+  if(request!==this.importSerial)return null;
+  const result=this.setManifest(raw,{files,mode:'directory'});onProgress(entries.length,entries.length,missing);return result;
  }
  async openURL(url){
   if(!/^https?:\/\//i.test(url))throw Error('Нужен URL http(s) к index.json; для диска используй «Папка тайлов»');
@@ -610,7 +621,11 @@ class RegionAtlas{
   document.getElementById('atlas-files')?.addEventListener('click',()=>document.getElementById('atlas-file-picker')?.click());
   document.getElementById('atlas-file-picker')?.addEventListener('change',async e=>{
    try{const files=[...(e.target.files||[])];if(!files.length)return;
-    const idx=await this.store.openDirectory(files);this.error='';
+    const idx=await this.store.openDirectory(files,(done,total,missing)=>{
+     const meter=document.getElementById('atlas-progress'),out=document.getElementById('atlas-offline');
+     if(total){meter.max=total;meter.value=done;}else meter.removeAttribute('value');
+     meter.hidden=total>0&&done===total;out.textContent=done===total&&total?'Офлайн: '+done+' тайлов проверено · отсутствует файлов '+missing:'Проверка доступности '+done+' / '+total;
+    });if(!idx)return;this.error='';
     const region=idx.region;if(region)this.goTo(region.center[1],region.center[0],.09);
     this.schedule();
     this.statusMessage(`Папка подключена: ${idx.tiles.size} тайлов. Загружается только область на экране.`);

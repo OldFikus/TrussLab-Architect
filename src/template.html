@@ -66,7 +66,7 @@
  </nav>
  <div class="atlas-urlbar"><span>HTTP-индекс (при собственном локальном сервере):</span><input id="atlas-url" placeholder="http://localhost:8000/data/region_tiles/index.json" aria-label="URL регионального индекса"><button id="atlas-connect-url">Подключить</button><small id="atlas-capabilities">WebGL · WebGPU не активирован</small></div>
  <div class="atlas-stage-wrap"><canvas id="atlas-stage" aria-label="2D региональная карта; перетаскивание и масштаб колесом мыши"></canvas><div class="atlas-note">РЕГИОНАЛЬНЫЙ АТЛАС · исходные здания только после импорта GIS · демонстрационные объекты не являются реальными</div></div>
- <footer class="atlas-foot"><span id="atlas-status">Подключи подготовленную папку с географическими тайлами. GeoPack моста показывается как ограниченный фрагмент.</span><span id="atlas-scale"></span><span id="atlas-cursor">45.30844° N · 36.50649° E</span></footer>
+ <footer class="atlas-foot"><progress hidden id="atlas-progress" aria-label="Проверка файлов пакета"></progress><span id="atlas-offline" role="status"></span> <span id="atlas-status">Подключи подготовленную папку с географическими тайлами. GeoPack моста показывается как ограниченный фрагмент.</span><span id="atlas-scale"></span><span id="atlas-cursor">45.30844° N · 36.50649° E</span></footer>
 </section>
 
 <section id="region3d-overlay" hidden class="atlas-overlay region3d-overlay" aria-label="TrussLab 10.4 — региональный 3D-мир">

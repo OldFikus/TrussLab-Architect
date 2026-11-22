@@ -52,6 +52,7 @@ with tempfile.TemporaryDirectory() as tmp:
         (root/'demo/tiles/2_0.geojson').unlink()
         page.locator('#atlas-file-picker').set_input_files(root/'demo')
         page.wait_for_function("atlas.store.partialKeys.size===2 && atlas.store.failures===1")
+        assert 'отсутствует файлов 3' in page.locator('#atlas-offline').inner_text()
         assert page.evaluate("atlas.store.get('0:0').features.length") == 12
         assert page.evaluate("atlas.store.get('1:0').raster.height") == 256
         page.locator('#planet-retry').click()
