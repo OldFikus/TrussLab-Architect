@@ -19,7 +19,7 @@ with sync_playwright() as pw:
         page.locator('dialog[open] [data-open]').click()
         page.wait_for_function("atlas.store.loaded===1 && atlas.store.mode==='Демо'")
         page.locator('#atlas-file-picker').set_input_files(ROOT/'examples/region')
-        page.wait_for_function("atlas.store.loaded === 1 && atlas.stats.shapes === 1")
+        page.wait_for_function("atlas.store.mode==='directory' && atlas.store.loaded===1 && atlas.stats.shapes===1 && document.querySelector('#atlas-status').textContent.includes('CC0-1.0')")
         page.locator('#fidelity-open').click()
         assert 'Вымысел' in page.locator('#fidelity-dialog [data-record]').inner_text()
         assert page.evaluate("BUILTIN_GLB_ASSETS.filter(m=>m.basis).every(m=>decodeGLB(aDecode64(m.variants.high)).triangles>0)")
