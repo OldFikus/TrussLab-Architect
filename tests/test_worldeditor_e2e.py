@@ -2,7 +2,10 @@ import asyncio,json
 from pathlib import Path
 from playwright.async_api import async_playwright
 ROOT=Path(__file__).resolve().parents[1]
-HTML=(ROOT/'dist/TrussLab_Architect_14_0.html').read_text()
+import sys
+sys.path.insert(0,str(ROOT))
+from tools.build import VERSION
+HTML=(ROOT/'dist'/f'TrussLab_{VERSION}_SAFE.html').read_text(encoding='utf-8')
 FLAGS=['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']
 async def exercise(page,mobile):
  errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
@@ -74,7 +77,7 @@ async def exercise(page,mobile):
  await page.locator('#region3d-close').click()
 async def run():
  async with async_playwright() as pw:
-  browser=await pw.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=FLAGS)
+  browser=await pw.chromium.launch(headless=True,args=FLAGS)
   for mobile in [False,True]:
    page=await browser.new_page(viewport={'width':412 if mobile else 1330,'height':920 if mobile else 830},device_scale_factor=1)
    try:await exercise(page,mobile)

@@ -53,7 +53,7 @@ jobs:
           python -m playwright install --with-deps chromium
           python tests/test_planetstream.py
           python tests/test_region_import.py
-          for test in tests/test_heritage.py tests/test_planet_stress.py tests/test_release_candidate.py; do
+          for test in tests/test_heritage.py tests/test_planet_stress.py tests/test_release_candidate.py tests/test_coastal_layers.py tests/test_worldforge_package.py tests/test_worldeditor_e2e.py; do
             if test -f "$test"; then python "$test"; fi
           done
           for archive in dist/*.zip; do unzip -tq "$archive"; done

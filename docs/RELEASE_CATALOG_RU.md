@@ -9,7 +9,12 @@
 | `v15.0.0` | **InfrastructureSim** | 14.1–14.9 | Опубликован; учебная инфраструктурная симуляция |
 | — | **CitySim / WorldStream** | 15.1–15.10 | Только автономные промежуточные HTML, **не** входит в архив v15.0.0 |
 | — | **NatureWorld** | 16.1–16.9 | Отдельный этап разработки; статус определяется тестами, не номером версии |
-| — | PlanetStream / FidelityLab / ReleaseCandidate / WorldForge | 17.0–20.0 | Запланированы |
+| v17.x.0 | PlanetStream | 17.1–17.9 | Учебный регион, импорт и потоковая загрузка |
+| v18.x.0 | FidelityLab | 18.1–18.9 | Происхождение данных, модели, сравнение и журнал |
+| v19.x.0 | ReleaseCandidate | 19.1–19.9 | Автосохранение, телеметрия, офлайн, совместимость и загрузочные тесты |
+| v20.0.0 | WorldForge | 20.0 | Сводная версия GPU Clarity с профилями SAFE и LAB |
+
+Для серий 17–20 доступны TrussLab_X.Y_SAFE.html, TrussLab_X.Y_LAB.html, Portable.zip и Source.zip. Фактический перечень файлов каждого тега опубликован в [GitHub Releases](https://github.com/OldFikus/TrussLab-Architect/releases).
 
 ## Порядок публикации
 

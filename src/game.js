@@ -718,6 +718,7 @@ class RegionAtlas{
   const ctx=this.ctx;ctx.setTransform(dpr,0,0,dpr,0,0);const light=regChooseTheme();
   ctx.fillStyle=light?'#c8dfe0':'#153641';ctx.fillRect(0,0,w,h);
   this.paintCoast(ctx);
+  this.coastalOverlay?.(ctx);
   const keys=this.tileKeysForView(w,h);this.viewKeys=keys;this.store.request(keys);
   // EPSG:3857 grid lines, aligned with file indices.
   const tileSize=this.store.index?.size||2048;

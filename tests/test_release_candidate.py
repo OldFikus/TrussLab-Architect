@@ -20,7 +20,8 @@ with sync_playwright() as pw:
     }""")
     page.evaluate("async()=>{await TrussLabRecovery.checkpoint();await TrussLabRecovery.restore();}")
     page.locator('.scene-header .views [data-view="3d"]').click()
-    page.evaluate("""()=>{const ext=world3d.gl?.getExtension('WEBGL_lose_context');if(!ext)throw Error('Loss simulation unavailable');ext.loseContext();setTimeout(()=>ext.restoreContext(),700);}""")
+    with page.expect_navigation(wait_until='domcontentloaded', timeout=60000):
+        page.evaluate("""()=>{const ext=world3d.gl?.getExtension('WEBGL_lose_context');if(!ext)throw Error('Loss simulation unavailable');ext.loseContext();setTimeout(()=>ext.restoreContext(),700);}""")
     page.wait_for_function("document.querySelector('#rc-recover')?.parentElement.textContent.includes('Восстановлено') && world3d.gl && !world3d.gl.isContextLost()",timeout=60000)
     page.locator('#quality-lab-open').click()
     page.get_by_text('Телеметрия за 5 секунд',exact=True).click()
