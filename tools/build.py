@@ -11,12 +11,12 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'src'
 DIST = ROOT / 'dist'
-VERSION = '19.5'
+VERSION = '19.6'
 SERIES = 'ReleaseCandidate'
 GROUPS = {
     'STYLES': 'style.css worldeditor.css infrastructure.css citysim_plus.css world_visual.css nature.css quality_ui.css',
     'SCRIPT': 'planetstream.js rendercore/materials.js rendercore/capabilities.js game.js worldeditor_core.js worldeditor_ui.js worldeditor_region3d.js infrastructure_core.js infrastructure_ui.js',
-    'EXTENSIONS': 'citysim_plus.js citysim_plus_ui.js world_visual_core.js world_visual_ui.js nature_core.js nature_ui.js quality_ui.js planet_scene.js planet_atlas.js fidelity.js fidelity_ui.js heritage_ui.js recovery.js',
+    'EXTENSIONS': 'citysim_plus.js citysim_plus_ui.js world_visual_core.js world_visual_ui.js nature_core.js nature_ui.js quality_ui.js planet_scene.js planet_atlas.js fidelity.js fidelity_ui.js heritage_ui.js recovery.js guide.js',
 }
 
 def build():
@@ -29,6 +29,8 @@ def build():
     anchor='const BUILTIN_GLB_ASSETS=['
     assert html.count(anchor)==1
     html=html.replace(anchor,anchor+json.dumps(assets(),ensure_ascii=False)[1:-1]+',')
+    guide=(ROOT/'docs/EDITOR_GUIDE_RU.md').read_text(encoding='utf-8')
+    html=html.replace('null /* {{ EDITOR_GUIDE }} */',json.dumps(guide,ensure_ascii=False).replace('<',r'\u003c'))
     region=ROOT/'examples'/'region'
     demo={'manifest':json.loads((region/'index.json').read_text()),'files':{
         p.relative_to(region).as_posix():json.loads(p.read_text()) for p in (region/'tiles').glob('*.geojson')}}
@@ -45,6 +47,7 @@ def build():
         path.write_text(page)
         print(path.name, hashlib.sha256(path.read_bytes()).hexdigest())
     with ZipFile(DIST / f'TrussLab_{VERSION}_Portable.zip','w',ZIP_DEFLATED) as archive:
+        archive.write(ROOT/'docs/EDITOR_GUIDE_RU.md','EDITOR_GUIDE_RU.md')
         for path in [*DIST.glob(f'TrussLab_{VERSION}_*.html'), *sorted((ROOT/'examples').rglob('*'))]:
             if path.is_file(): archive.write(path, path.name if path.parent == DIST else path.relative_to(ROOT))
     with ZipFile(DIST / f'TrussLab_{VERSION}_Source.zip','w',ZIP_DEFLATED) as archive:

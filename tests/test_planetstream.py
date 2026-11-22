@@ -14,6 +14,9 @@ with sync_playwright() as pw:
     page.context.set_offline(True)
     for profile in ('SAFE','LAB'):
         page.goto((ROOT/'dist'/f'TrussLab_{VERSION}_{profile}.html').as_uri())
+        page.locator('#rc-guide').click()
+        assert 'Учебная гавань' in page.locator('dialog[open]').inner_text()
+        page.locator('dialog[open] button').click()
         page.locator('#atlas-open').click()
         page.locator('#planet-atlas').click()
         page.locator('dialog[open] [data-open]').click()
