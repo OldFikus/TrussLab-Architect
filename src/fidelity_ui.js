@@ -68,3 +68,16 @@
     }catch(error){out.textContent=error.message;}
   };
 })();
+
+(() => {
+  const details=document.createElement('details'),summary=document.createElement('summary');
+  summary.textContent='Права и источники встроенных материалов';details.append(summary);
+  const sources=[["Береговая линия GeoPack","© OpenStreetMap contributors · geo-maps / Simone Primarosa","ODbL 1.0 (производный растр)","https://www.openstreetmap.org/copyright"],["Региональная береговая линия","GSHHG · Paul Wessel, Walter H. F. Smith","GNU LGPL · исходная база","https://www.soest.hawaii.edu/pwessel/gshhg/"],["Высоты DSM","Copernicus WorldDEM-30","Данные GLO-30, производная сетка","https://doi.org/10.5270/esa-c5d3d65"],["Демонстрационные GLB и учебная гавань","TrussLab","CC0-1.0 · авторская геометрия","https://creativecommons.org/publicdomain/zero/1.0/"],["Камеры курганов и текстуры кладки","TrussLab · геометрия по опубликованным размерам","CC0-1.0 · оригинальная реконструкция","https://archaeolog.ru/media/periodicals/agis/AGIS-4/Presentations/Smekalov/mondeskr/tsarkurg.htm"],["Фотография Царского кургана (внешняя ссылка)","Anatoly Shcherbak","CC BY-SA 3.0","https://commons.wikimedia.org/wiki/File:Царський_курган_007.jpg"]];
+  for(const [asset,author,license,url] of sources){
+    const p=document.createElement('p'),a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.textContent=asset;
+    p.append(a,document.createTextNode(' · '+author+' · '+license));details.append(p);
+  }
+  const notice=document.createElement('p');
+  notice.textContent='Произведено с использованием Copernicus WorldDEM-30 © DLR e.V. 2010–2014 и © Airbus Defence and Space GmbH 2014–2018, предоставленного в рамках COPERNICUS Европейским союзом и ESA. Все права защищены. Организации, отвечающие за программу Copernicus по закону или делегированию, не несут ответственности за использование Copernicus WorldDEM-30.';
+  details.append(notice);document.getElementById('fidelity-dialog').append(details);
+})();

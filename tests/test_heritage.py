@@ -13,3 +13,9 @@ for model in MONUMENTS:
     assert doc['accessors'][0]['count']==doc['accessors'][1]['count']==len(points)
     offset=28+length+doc['bufferViews'][2]['byteOffset']
     assert blob[offset:offset+8]==b'\x89PNG\r\n\x1a\n'
+
+root=Path(__file__).resolve().parents[1]
+assert 'const PACKED=' not in (root/'src/game.js').read_text()
+credits=(root/'src/fidelity_ui.js').read_text()
+for dataset in ('DLR','Airbus','OpenStreetMap','GSHHG','CC BY-SA 3.0','CC0-1.0'):
+    assert dataset in credits
