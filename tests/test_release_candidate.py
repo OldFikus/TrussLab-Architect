@@ -8,6 +8,16 @@ with sync_playwright() as pw:
     browser=pw.chromium.launch(args=['--enable-unsafe-swiftshader'])
     page=browser.new_page()
     page.goto((ROOT/'dist'/f'TrussLab_{VERSION}_SAFE.html').as_uri())
+    page.evaluate("""()=>{
+      const current=studioSnapshot();
+      for(let version=2;version<=9;version++){
+        restoreStudioSnapshot({version,idx:current.idx,track:current.track,model:current.model,foundation:current.foundation});
+        if(studioSnapshot().track!==current.track)throw Error('Сбой восстановления');
+      }
+      restoreStudioSnapshot(current);
+      const pack=TrussLabCityPlusUI.makeProject();delete pack.natureWorld;delete pack.worldVisual;
+      TrussLabCityPlusUI.applyProject(pack);
+    }""")
     page.evaluate("async()=>{await TrussLabRecovery.checkpoint();await TrussLabRecovery.restore();}")
     page.locator('.scene-header .views [data-view="3d"]').click()
     page.evaluate("""()=>{const ext=world3d.gl?.getExtension('WEBGL_lose_context');if(!ext)throw Error('Loss simulation unavailable');ext.loseContext();setTimeout(()=>ext.restoreContext(),700);}""")

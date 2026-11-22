@@ -1,7 +1,7 @@
 name: Test and publish TrussLab
 on:
   push:
-    branches: [main, 'release/planetstream-*']
+    branches: [main, 'release/planetstream-*', 'release/candidate-*']
     paths: ['src/**', 'tests/**', 'tools/**', 'examples/**', '.github/workflows/publish-release.yml']
   workflow_dispatch:
 permissions:

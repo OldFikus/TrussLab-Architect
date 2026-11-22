@@ -11,7 +11,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'src'
 DIST = ROOT / 'dist'
-VERSION = '19.8'
+VERSION = '19.9'
 SERIES = 'ReleaseCandidate'
 GROUPS = {
     'STYLES': 'style.css worldeditor.css infrastructure.css citysim_plus.css world_visual.css nature.css quality_ui.css',
@@ -44,7 +44,8 @@ def build():
         title = f'TrussLab Architect {VERSION} — {SERIES} · GPU Clarity {profile}'
         page = page.replace('TrussLab Architect 16.0 — GPU Clarity SAFE · 1080p / 1440p</title>', title + '</title>')
         path = DIST / f'TrussLab_{VERSION}_{profile}.html'
-        path.write_text(page)
+        page=page.replace('v16.0 GPU TEMPORAL LAB',f'v{VERSION} {SERIES} · {profile}')
+        path.write_text(page,encoding='utf-8')
         print(path.name, hashlib.sha256(path.read_bytes()).hexdigest())
     with ZipFile(DIST / f'TrussLab_{VERSION}_Portable.zip','w',ZIP_DEFLATED) as archive:
         archive.write(ROOT/'docs/DATA_AND_LICENSES_RU.md','DATA_AND_LICENSES_RU.md')
@@ -58,6 +59,9 @@ def build():
             path = ROOT/name
             for item in sorted(path.rglob('*')) if path.is_dir() else [path]:
                 if item.is_file() and '__pycache__' not in item.parts: archive.write(item,item.relative_to(ROOT))
+
+    paths=sorted(p for p in DIST.glob(f'TrussLab_{VERSION}_*') if p.suffix in ('.html','.zip'))
+    (DIST/f'SHA256_{VERSION}.txt').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in paths),encoding='utf-8')
 
 if __name__ == '__main__':
     build()

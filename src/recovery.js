@@ -12,10 +12,15 @@
     out.textContent='Сохранено '+data.created;
   }
   function checkpoint(){const next=queue.then(write);queue=next.catch(e=>{out.textContent='Автосохранение недоступно: '+e.message;});return next;}
-  async function restore(){
-    await queue;
+  async function readSaved(){
     const db=await ui.store.db();
-    let data;try{data=await new Promise((ok,bad)=>{const req=db.transaction('worlds').objectStore('worlds').get(key);req.onsuccess=()=>ok(req.result);req.onerror=()=>bad(req.error);});}finally{db.close();}
+    try{return await new Promise((ok,bad)=>{const req=db.transaction('worlds').objectStore('worlds').get(key);req.onsuccess=()=>ok(req.result);req.onerror=()=>bad(req.error);});}
+    finally{db.close();}
+  }
+  const previous=readSaved().catch(()=>null);
+  async function restore(preferPrevious=false){
+    clearTimeout(timer);await queue;
+    const data=(preferPrevious?await previous:null)||await readSaved();
     if(data?.version!==1||!data.studio||!data.city||!data.infra)throw Error('Нет совместимого снимка');
     restoreStudioSnapshot(data.studio);ui.applyProject(data.city);globalThis.trusslabInfraSim.import(data.infra);
     out.textContent='Восстановлено '+data.created;
@@ -23,7 +28,7 @@
   function dirty(e){if(line.contains(e.target))return;sequence++;clearTimeout(timer);timer=setTimeout(()=>{checkpoint().catch(()=>{});},1800);}
   for(const event of ['change','pointerup','keyup'])document.addEventListener(event,dirty,true);
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&sequence){clearTimeout(timer);checkpoint().catch(()=>{});}});
-  line.querySelector('button').onclick=()=>restore().catch(e=>{out.textContent=e.message;});
+  line.querySelector('button').onclick=()=>restore(true).catch(e=>{out.textContent=e.message;});
   document.addEventListener('webglcontextlost',e=>{
     if(e.target!==world3d.canvas && e.target!==region3d.canvas)return;
     e.preventDefault();clearTimeout(timer);lost=checkpoint();lost.catch(()=>{});
