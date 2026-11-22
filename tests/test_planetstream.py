@@ -14,10 +14,14 @@ with sync_playwright() as pw:
     page.context.set_offline(True)
     for profile in ('SAFE','LAB'):
         page.goto((ROOT/'dist'/f'TrussLab_{VERSION}_{profile}.html').as_uri())
-        page.locator('#rc-guide').click()
+        page.keyboard.press('F1')
         assert 'Учебная гавань' in page.locator('dialog[open]').inner_text()
         page.locator('dialog[open] button').click()
         page.locator('#atlas-open').click()
+        page.locator('#atlas-stage').focus()
+        x=page.evaluate('atlas.center.x')
+        page.keyboard.press('ArrowRight')
+        assert page.evaluate('atlas.center.x')>x
         page.locator('#planet-atlas').click()
         page.locator('dialog[open] [data-open]').click()
         page.wait_for_function("atlas.store.loaded===1 && atlas.store.mode==='Демо'")
