@@ -26,4 +26,7 @@ with sync_playwright() as pw:
     assert data['splits'][0]>0 and data['maps']==[1,2,3] and data['error']==0 and not data['lost'], data
     page.locator('#q-shadow-detail').select_option('standard')
     page.wait_for_function("world3d.gl.getUniform(world3d.prog,world3d.uCascadeSplits)[0]===0")
+    assert page.evaluate('!!world3d.gpuTimer')
+    if page.evaluate('!!world3d.gpuTimer.ext'):
+        page.wait_for_function('world3d.gpuStats.queries>0 && world3d.gpuStats.gpuMs>=0',timeout=60000)
     browser.close()

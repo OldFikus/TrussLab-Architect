@@ -13,6 +13,7 @@
 | v18.x.0 | FidelityLab | 18.1–18.9 | Происхождение данных, модели, сравнение и журнал |
 | v19.x.0 | ReleaseCandidate | 19.1–19.9 | Автосохранение, телеметрия, офлайн, совместимость и загрузочные тесты |
 | v20.0.0 | WorldForge | 20.0 | Сводная версия GPU Clarity с профилями SAFE и LAB |
+| v20.1.0, v20.2.0 | WorldForge | Сверка 10.0–20.0 | Покрытие DEM, каскадные тени, материалы, GPU-таймер и визуальная регрессия отражений |
 
 Для серий 17–20 доступны TrussLab_X.Y_SAFE.html, TrussLab_X.Y_LAB.html, Portable.zip и Source.zip. Фактический перечень файлов каждого тега опубликован в [GitHub Releases](https://github.com/OldFikus/TrussLab-Architect/releases).
 

@@ -49,13 +49,15 @@ jobs:
       - name: Build and test both standalone profiles
         run: |
           python tools/build.py
-          python -m pip install playwright -r tools/requirements-region.txt
+          python -m pip install playwright pillow -r tools/requirements-region.txt
           python -m playwright install --with-deps chromium
           python tests/test_planetstream.py
           python tests/test_region_import.py
-          for test in tests/test_heritage.py tests/test_planet_stress.py tests/test_release_candidate.py tests/test_coastal_layers.py tests/test_worldforge_package.py tests/test_worldeditor_e2e.py tests/test_lab_materials.py tests/test_assetstream.py; do
+          for test in tests/test_heritage.py tests/test_planet_stress.py tests/test_release_candidate.py tests/test_coastal_layers.py tests/test_worldforge_package.py tests/test_worldeditor_e2e.py tests/test_lab_materials.py tests/test_assetstream.py tests/test_visual_reflection_regression.py; do
             if test -f "$test"; then python "$test"; fi
           done
+          python tests/test_compatibility.py chromium --webgpu-software
+          mv compat-WebGPU-SwiftShader.json dist/
           for archive in dist/*.zip; do unzip -tq "$archive"; done
       - uses: actions/download-artifact@v4
         if: needs.compatibility.result == 'success'

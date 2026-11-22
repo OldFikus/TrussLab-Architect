@@ -10,6 +10,9 @@ from pathlib import Path
 from PIL import Image
 from playwright.async_api import async_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0,str(ROOT))
+from tools.build import VERSION
 ARGS=['--no-sandbox','--enable-webgl','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader','--disable-dev-shm-usage','--ignore-gpu-blocklist']
 
 def structural_pixels(png):
@@ -20,10 +23,11 @@ def structural_pixels(png):
 
 async def main():
  async with async_playwright() as pw:
-  browser=await pw.chromium.launch(headless=False,executable_path='/usr/bin/chromium',args=ARGS)
+  browser=await pw.chromium.launch(headless=True,args=ARGS)
   page=await browser.new_page(viewport={'width':1120,'height':910})
   errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
-  await page.set_content((ROOT/'dist/TrussLab_Architect_13_0.html').read_text(),wait_until='load',timeout=85000)
+  await page.set_content((ROOT/'dist'/f'TrussLab_{VERSION}_LAB.html').read_text(),wait_until='load',timeout=85000)
+  await page.locator('.scene-header .views [data-view="3d"]').click()
   counts={}
   for mode in ('eco','cinematic'):
     result=await page.evaluate('''(mode)=>{world3d.postQuality='off';world3d.waterMode=mode;

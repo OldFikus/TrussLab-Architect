@@ -10,6 +10,9 @@ from tools.build import VERSION
 engine=sys.argv[1]
 with sync_playwright() as pw:
     args=['--enable-unsafe-swiftshader'] if engine=='chromium' else []
+    forced_webgpu = '--webgpu-software' in sys.argv
+    if forced_webgpu:
+        args += ['--enable-unsafe-webgpu', '--use-angle=swiftshader']
     browser=getattr(pw,engine).launch(args=args)
     page=browser.new_page()
     errors=[]
@@ -32,6 +35,8 @@ with sync_playwright() as pw:
     page.locator('#region3d-open').click()
     available = page.evaluate('async()=>Boolean(await navigator.gpu?.requestAdapter())')
     data['webgpuAdapter'] = available
+    if forced_webgpu:
+        assert available, 'Software WebGPU adapter missing'
     if available:
         assert page.evaluate('async()=>Boolean(region3d.webgpu || await region3d.enableWebGPU())')
         page.evaluate('region3d.webgpu.device.destroy()')
@@ -42,5 +47,6 @@ with sync_playwright() as pw:
     assert not errors, errors
     data.update(os=platform.system(),engine=engine,version=browser.version)
     print(json.dumps(data,ensure_ascii=False))
-    Path(f'compat-{platform.system()}-{engine}.json').write_text(json.dumps(data,ensure_ascii=False))
+    report = 'compat-WebGPU-SwiftShader.json' if forced_webgpu else f'compat-{platform.system()}-{engine}.json'
+    Path(report).write_text(json.dumps(data,ensure_ascii=False), encoding='utf-8')
     browser.close()

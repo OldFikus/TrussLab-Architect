@@ -57,9 +57,10 @@
       const mem=world3d.estimateGPUMemory(),stats=world3d.stats||{};
       const record={fps:+(intervals.length*1000/(time-start)).toFixed(1),p95Ms:+intervals[Math.floor(intervals.length*.95)].toFixed(1),
         maxMs:+intervals.at(-1).toFixed(1),slowFrames:intervals.filter(ms=>ms>50).length,
+        gpuDrawMs:world3d.gpuStats?.gpuMs??null,cpuDrawMs:world3d.gpuStats?.cpuDrawMs??null,
         estimatedResourcesMiB:+(mem.ownedBytes/1048576).toFixed(2),drawCalls:stats.drawCalls??null,
         jsHeapMiB:performance.memory?+(performance.memory.usedJSHeapSize/1048576).toFixed(1):null};
-      out.textContent=record.fps+' кадров/с · p95 '+record.p95Ms+' мс · максимум '+record.maxMs+' мс · кадров >50 мс: '+record.slowFrames+' · draw calls '+(record.drawCalls??'нет данных')+' · оценка ресурсов GPU '+record.estimatedResourcesMiB+' МиБ · JS-куча '+(record.jsHeapMiB??'нет данных');
+      out.textContent=record.fps+' кадров/с · p95 '+record.p95Ms+' мс · максимум '+record.maxMs+' мс · кадров >50 мс: '+record.slowFrames+' · draw calls '+(record.drawCalls??'нет данных')+' · GPU (отрисовка) '+(record.gpuDrawMs?.toFixed(2)??'нет данных')+' мс · CPU (отрисовка) '+(record.cpuDrawMs?.toFixed(2)??'нет данных')+' мс · оценка ресурсов GPU '+record.estimatedResourcesMiB+' МиБ · JS-куча '+(record.jsHeapMiB??'нет данных');
       button.disabled=false;section.dataset.report=JSON.stringify(record);
     }
     requestAnimationFrame(sample);
