@@ -1,4 +1,4 @@
-"""Build offline PlanetStream from the editable GPU Clarity SAFE modules."""
+"""Build offline WorldForge from the editable GPU Clarity SAFE modules."""
 from pathlib import Path
 import hashlib
 import json
