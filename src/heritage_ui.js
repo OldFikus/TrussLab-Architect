@@ -30,3 +30,26 @@
   section.querySelector('button').onclick=()=>{const m=current(),a=document.createElement('a'),url=URL.createObjectURL(new Blob([aDecode64(m.variants.high)],{type:'model/gltf-binary'}));a.href=url;a.download=m.id+'.glb';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   draw();
 })();
+
+(() => {
+  const panel=document.querySelector('#fidelity-dialog [data-description]').parentElement;
+  const modelCanvas=panel.querySelector('canvas');
+  const box=document.createElement('fieldset');
+  box.innerHTML='<legend>Сравнение с фотографией</legend><p><a target="_blank" rel="noopener" href="https://commons.wikimedia.org/wiki/File:Царський_курган_007.jpg">Царский курган, Anatoly Shcherbak</a> · <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a></p><label>Автор и разрешение на использование <input data-photo-rights maxlength="300"></label> <label>Локальная фотография <input data-photo type="file" accept="image/jpeg,image/png,image/webp"></label><label>Непрозрачность фотографии <input type="range" data-opacity min="0" max="100" value="50"></label><button type="button" data-clear>Убрать фотографию</button><output role="status"></output>';
+  const stage=document.createElement('div');stage.style.position='relative';modelCanvas.before(stage);stage.append(modelCanvas);
+  const photo=document.createElement('img');photo.alt='Фотография для сверки силуэта';photo.hidden=true;photo.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;opacity:.5';stage.append(photo);panel.append(box);
+  const file=box.querySelector('[data-photo]'),out=box.querySelector('output');
+  let url=null,revision=0;
+  function reset(){revision++;photo.hidden=true;photo.removeAttribute('src');if(url)URL.revokeObjectURL(url);url=null;file.value='';out.textContent='';}
+  file.onchange=async()=>{
+    const f=file.files[0],rights=box.querySelector('[data-photo-rights]').value.trim();reset();const current=revision;
+    if(!f)return;
+    if(!rights||!['image/png','image/jpeg','image/webp'].includes(f.type)||f.size>16*1024*1024){out.textContent='Укажите права и выберите PNG, JPEG или WebP до 16 МиБ.';return;}
+    url=URL.createObjectURL(f);photo.src=url;
+    try{await photo.decode();if(current!==revision)return;photo.hidden=false;out.textContent=rights+' · '+f.name;}
+    catch{if(current===revision){reset();out.textContent='Не удалось открыть изображение.';}}
+  };
+  box.querySelector('[data-opacity]').oninput=e=>photo.style.opacity=Number(e.target.value)/100;
+  box.querySelector('[data-clear]').onclick=reset;
+  panel.querySelector('select').addEventListener('change',reset);
+})();

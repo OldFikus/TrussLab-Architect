@@ -25,6 +25,12 @@ with sync_playwright() as pw:
         assert page.evaluate("BUILTIN_GLB_ASSETS.filter(m=>m.basis).every(m=>decodeGLB(aDecode64(m.variants.high)).triangles>0)")
         page.locator('#fidelity-dialog section select').select_option('melek-chamber')
         assert '3,7 × 4' in page.locator('#fidelity-dialog [data-description]').inner_text()
+        page.locator('[data-photo-rights]').fill('TrussLab · тест')
+        photo_bytes = __import__('base64').b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jmS8AAAAASUVORK5CYII=')
+        page.locator('[data-photo]').set_input_files({'name':'reference.png','mimeType':'image/png','buffer':photo_bytes})
+        page.locator('#fidelity-dialog img').wait_for(state='visible')
+        page.locator('[data-clear]').click()
+        assert page.locator('#fidelity-dialog img').is_hidden()
         page.locator('#fidelity-dialog [data-close]').click()
         assert 'CC0-1.0' in page.locator('#atlas-status').inner_text()
         assert abs(page.evaluate('mercatorUnproject(atlas.center.x,atlas.center.y).lon') - .005) < 1e-8
