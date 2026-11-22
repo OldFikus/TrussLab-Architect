@@ -7,11 +7,29 @@
   document.body.append(dialog);
   const select=dialog.querySelector('[data-objects]'),details=dialog.querySelector('[data-record]');
   let records=[];
+  const journal=document.createElement('fieldset');
+  journal.innerHTML='<legend>Журнал расхождений</legend><label>Расхождение <input data-reason maxlength="240"></label><label>Исправленное состояние <input data-correction maxlength="240"></label><button data-apply>Применить исправление</button><ol data-history></ol><output role="status"></output>';
+  details.after(journal);
+  const key='trusslab-fidelity-journal-v1';
+  function history(){const list=JSON.parse(localStorage.getItem(key)||'[]');if(!Array.isArray(list))throw Error('Повреждён журнал');return list;}
+  function identity(item){return JSON.stringify([atlas.store.index?.region?.id||atlas.store.index?.metadata?.sources||'',item.key,item.f.id??null,item.f.geometry]);}
+  function changes(item){const target=identity(item);return history().filter(row=>row.target===target);}
+  journal.querySelector('[data-apply]').onclick=()=>{
+    const item=records[select.selectedIndex],reason=journal.querySelector('[data-reason]'),state=journal.querySelector('[data-correction]'),status=journal.querySelector('output');
+    if(!item||!reason.value.trim()||!state.value.trim()){status.textContent='Выберите объект и заполните оба поля.';return;}
+    try{
+      const rows=history();rows.push({target:identity(item),reason:reason.value.trim(),state:state.value.trim(),date:new Date().toISOString()});
+      localStorage.setItem(key,JSON.stringify(rows));reason.value='';state.value='';paint();status.textContent='Исправление сохранено.';
+    }catch(error){status.textContent='Запись не сохранена: '+error.message;}
+  };
   function paint(){
-    details.replaceChildren();
+    details.replaceChildren();const list=journal.querySelector('[data-history]');list.replaceChildren();
     const item=records[select.selectedIndex];
     if(!item){details.textContent='На экране нет объектов с загруженной геометрией.';return;}
     const record=fidelityRecord(item.f,atlas.store.index?.region,dialog.querySelector('[data-asof]').value);
+    try{const cutoff=dialog.querySelector('[data-asof]').value;
+      for(const row of changes(item)){const li=document.createElement('li');li.textContent=row.date.slice(0,10)+' · '+row.reason+' → '+row.state;list.append(li);if(!cutoff||row.date.slice(0,10)<=cutoff)record.state=row.state;}
+    }catch(error){journal.querySelector('output').textContent=error.message;}
     const fields={'Тайл':item.key,'Тип свидетельства':FIDELITY_KINDS[record.kind],'Оценка':record.quality,'Авторство':record.author,'Права':record.license,'Основание':record.reference||'Нет данных','Дата наблюдения':record.date||'Нет данных','Состояние':record.state};
     for(const [key,value] of Object.entries(fields)){
       const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=key;dd.textContent=value;details.append(dt,dd);
