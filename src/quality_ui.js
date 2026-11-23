@@ -27,6 +27,10 @@ function refresh(){const gl=world3d.gl;
  for(const id of ['q-shadows','q-reflections'])$(id).disabled=!world3d.gpuBalancedMode;
  const available=!!gl&&!gl.isContextLost(),samples=world3d.post?.msaa?.samples||(available?gl.getParameter(gl.SAMPLES):0),webgl=world3d.renderCoreCaps?.backend||'CPU',label=world3d.shaderProfile||'unknown';
  $('q-report').textContent=`GPU: ${webgl.toUpperCase()} · ${label}\nCanvas MSAA: ${available?String(!!gl.getContextAttributes()?.antialias):'—'} · samples ${samples||0}\nAA: ${world3d.aaMode} · FXAA ${world3d.postQuality} · ${world3d.canvas.width}×${world3d.canvas.height} px\nПресет: ${world3d.clarityPreset||'auto'} · запрошено: ${world3d.clarityRequested?world3d.clarityRequested.join('×'):'от размера окна'}${world3d.clarityLimited?' · ограничено GPU-бюджетом':''} · экран: ${Math.round(world3d.canvas.clientWidth)}×${Math.round(world3d.canvas.clientHeight)} CSS px\nShadow atlas: ${world3d.qualityEffects?.shadows&&world3d.shadowProg?'готов':'откл.'} (${world3d.shadowSize||0}²) · отражения: ${world3d.reflection?.ready?'готовы':'не активны'} (${world3d.reflection?.size||0}²) · TAA история: ${world3d.post?.valid?'есть':'нет'}\nFPS: ${world3d.stats.fps||'—'}`;
+ if(!available){
+  const attempts=world3d.gpuFailures||[];
+  $('q-report').textContent+='\nПрограммная 3D-отрисовка. Попытки запуска WebGL:\n'+attempts.join('\n');
+ }
  $('q-switch').textContent=world3d.gpuBalancedMode?'Запустить SAFE':'Попробовать BALANCED';
 }
 $('q-aa').addEventListener('change',e=>{

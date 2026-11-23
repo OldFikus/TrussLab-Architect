@@ -11,11 +11,11 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'src'
 DIST = ROOT / 'dist'
-VERSION = '20.2'
+VERSION = '20.3'
 SERIES = 'WorldForge'
 GROUPS = {
     'STYLES': 'style.css worldeditor.css infrastructure.css citysim_plus.css world_visual.css nature.css quality_ui.css',
-    'SCRIPT': 'planetstream.js rendercore/materials.js rendercore/capabilities.js game.js worldeditor_core.js worldeditor_ui.js worldeditor_region3d.js infrastructure_core.js infrastructure_ui.js',
+    'SCRIPT': 'planetstream.js rendercore/materials.js rendercore/capabilities.js rendercore/software.js game.js worldeditor_core.js worldeditor_ui.js worldeditor_region3d.js infrastructure_core.js infrastructure_ui.js',
     'EXTENSIONS': 'citysim_plus.js citysim_plus_ui.js world_visual_core.js world_visual_ui.js nature_core.js nature_ui.js quality_ui.js planet_scene.js planet_atlas.js fidelity.js fidelity_ui.js heritage_ui.js recovery.js guide.js coastal_layers.js',
 }
 

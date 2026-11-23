@@ -2,7 +2,7 @@
 
 Браузерный 3D-конструктор моста, географического мира и городской симуляции. **Основная ветка содержит исходники, тесты и сборщик.** Готовые автономные HTML/ZIP хранятся в [GitHub Releases](https://github.com/OldFikus/TrussLab-Architect/releases).
 
-**Текущая сборка GPU Clarity** — [WorldForge SAFE, LAB и архивы](https://github.com/OldFikus/TrussLab-Architect/releases/tag/v20.2.0). [Поэтапная сверка 10.0–20.0 и ограничения](docs/AUDIT_10_TO_20_RU.md).
+**Текущая сборка GPU Clarity** — [WorldForge SAFE, LAB и архивы](https://github.com/OldFikus/TrussLab-Architect/releases/tag/v20.3.0). [Поэтапная сверка 10.0–20.0 и ограничения](docs/AUDIT_10_TO_20_RU.md).
 
 ## Исторические выпуски и фактическое наполнение
 
